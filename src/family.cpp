@@ -148,27 +148,54 @@ void FamilyStore::link(std::int64_t follower, std::int64_t target,
     l.validate();
 
     auto data = load();
+    auto now_str = formatTimePoint(Clock::now());
+
+    // A → B (создаём или обновляем)
+    bool foundAB = false;
     for (auto& e : data["links"]) {
         if (e.value("follower", static_cast<std::int64_t>(0)) == follower &&
             e.value("target", static_cast<std::int64_t>(0)) == target) {
             e["relation"] = relation;
-            save(data);
-            return;
+            foundAB = true;
+            break;
         }
     }
+    if (!foundAB) {
+        l.created_at = now_str;
+        data["links"].push_back(l);
+    }
 
-    l.created_at = formatTimePoint(Clock::now());
-    data["links"].push_back(l);
+    // B → A (обратная связь — создаём если нет)
+    bool foundBA = false;
+    for (const auto& e : data["links"]) {
+        if (e.value("follower", static_cast<std::int64_t>(0)) == target &&
+            e.value("target", static_cast<std::int64_t>(0)) == follower) {
+            foundBA = true;
+            break;
+        }
+    }
+    if (!foundBA) {
+        FamilyLink rev;
+        rev.follower = target;
+        rev.target = follower;
+        rev.relation = relation;
+        rev.created_at = now_str;
+        rev.validate();
+        data["links"].push_back(rev);
+    }
+
     save(data);
 }
 
 void FamilyStore::unlink(std::int64_t follower, std::int64_t target) {
     auto data = load();
     auto& links = data["links"];
+    // Удаляем обе связи: A→B и B→A
     auto it = std::remove_if(
         links.begin(), links.end(), [follower, target](const nlohmann::json& e) {
-            return e.value("follower", static_cast<std::int64_t>(0)) == follower &&
-                   e.value("target", static_cast<std::int64_t>(0)) == target;
+            auto f = e.value("follower", static_cast<std::int64_t>(0));
+            auto t = e.value("target", static_cast<std::int64_t>(0));
+            return (f == follower && t == target) || (f == target && t == follower);
         });
     if (it == links.end()) {
         throw NotFoundError("Family link not found");

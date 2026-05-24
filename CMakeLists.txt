@@ -29,6 +29,8 @@ target_include_directories(pillio PRIVATE src ${THIRD_PARTY_DIR})
 
 if(UNIX)
     target_link_libraries(pillio PRIVATE pthread ssl crypto)
+elseif(WIN32)
+    target_link_libraries(pillio PRIVATE ws2_32)
 endif()
 
 # ── Test executable ─────────────────────────────────────────────────

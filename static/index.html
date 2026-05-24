@@ -672,11 +672,8 @@ body {
         <button class="fam-add-btn" id="famAddBtn" style="width:100%">Добавить</button>
       </div>
 
-      <div class="section-title">Я слежу за</div>
+      <div class="section-title">Участники</div>
       <div id="famFollowing"></div>
-
-      <div class="section-title">За мной следят</div>
-      <div id="famFollowers"></div>
     </div>
 
     <!-- SETTINGS -->
@@ -1195,7 +1192,7 @@ async function loadFamily() {
       followingCache = list;
       const el = $('famFollowing');
       if (!list.length) {
-        el.innerHTML = '<div class="empty"><div class="empty-txt">Вы пока ни за кем не следите</div></div>';
+        el.innerHTML = '<div class="empty"><div class="empty-txt">Добавьте близких по коду</div></div>';
       } else {
         el.innerHTML = list.map((f, idx) => {
           const pct = f.status ? Math.round((f.status.progress || 0) * 100) : 0;
@@ -1219,29 +1216,6 @@ async function loadFamily() {
     }
   } catch {}
 
-  // Followers
-  try {
-    const r = await apiFetch(`${API}/api/family/followers?uid=${UID}`);
-    if (r.ok) {
-      const d = await r.json();
-      const list = d.followers || [];
-      const el = $('famFollowers');
-      if (!list.length) {
-        el.innerHTML = '<div class="empty"><div class="empty-txt">Пока никто не следит за вами</div></div>';
-      } else {
-        el.innerHTML = list.map(f => {
-          const av = COLORS[Math.abs(f.chat_id) % COLORS.length];
-          return `<div class="fam-person">
-            <div class="fam-avatar ${av}">${initials(f.name)}</div>
-            <div class="fam-person-info">
-              <div class="fam-person-name">${esc(f.name)}</div>
-              <div class="fam-person-rel">${esc(f.relation)}</div>
-            </div>
-          </div>`;
-        }).join('');
-      }
-    }
-  } catch {}
 }
 
 $('famCopy').onclick = () => {
