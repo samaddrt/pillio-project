@@ -1,6 +1,7 @@
 # Build
 cmake-build-*/
 build/
+pylibs/
 
 # Data (runtime state — never commit)
 data/store.json
