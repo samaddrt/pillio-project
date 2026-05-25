@@ -28,7 +28,7 @@ add_executable(pillio
 target_include_directories(pillio PRIVATE src ${THIRD_PARTY_DIR})
 
 if(UNIX)
-    target_link_libraries(pillio PRIVATE pthread ssl crypto)
+    target_link_libraries(pillio PRIVATE pthread)
 elseif(WIN32)
     target_link_libraries(pillio PRIVATE ws2_32)
 endif()
