@@ -489,6 +489,12 @@ body {
 .fd-item-state{font-size:11px;font-weight:600;flex-shrink:0;padding:4px 9px;border-radius:9px}
 .fd-item-state.taken{background:var(--sage-bg);color:var(--sage)}
 .fd-item-state.pending{background:var(--bg3);color:var(--text3)}
+.btn-fam-remove{
+  width:100%;padding:12px;border:1px solid rgba(217,128,92,.25);border-radius:var(--r);
+  font:600 13px var(--ui);cursor:pointer;background:var(--clay-bg);color:var(--clay);
+  margin-top:18px;transition:.18s;
+}
+.btn-fam-remove:active{transform:scale(.98);opacity:.8}
 
 /* ── Settings ───────────────────────────────────────────────────── */
 .set-group{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin:12px 0}
@@ -804,6 +810,7 @@ body {
     </div>
     <div class="fd-sec">Лекарства сегодня</div>
     <div id="fdItems"></div>
+    <button class="btn-fam-remove" id="fdRemoveBtn">Удалить из семьи</button>
   </div>
 </div>
 
@@ -1120,10 +1127,28 @@ let followingCache = [];
 
 const MEAL_FULL = { before: 'До еды', during: 'Во время еды', after: 'После еды', none: '' };
 
-function openFamMember(idx) {
+async function openFamMember(idx) {
   haptic();
   const f = followingCache[idx];
   if (!f) return;
+
+  // Показываем модалку сразу с кэшированными данными
+  renderFamDetail(f);
+  $('famOv').classList.add('open');
+  try { tg?.BackButton?.show() } catch {}
+
+  // Подгружаем свежие данные с сервера
+  try {
+    const r = await apiFetch(`${API}/api/family/members?uid=${UID}`);
+    if (r.ok) {
+      const d = await r.json();
+      const fresh = (d.members || []).find(m => m.chat_id === f.chat_id);
+      if (fresh) renderFamDetail(fresh);
+    }
+  } catch {}
+}
+
+function renderFamDetail(f) {
   const st = f.status || {};
   const av = COLORS[Math.abs(f.chat_id) % COLORS.length];
   const avEl = $('fdAvatar');
@@ -1134,6 +1159,7 @@ function openFamMember(idx) {
   $('fdPct').textContent = Math.round((st.progress || 0) * 100) + '%';
   $('fdStreak').innerHTML = '🔥 ' + (st.streak || 0);
   $('fdTaken').textContent = (st.taken || 0) + '/' + (st.total || 0);
+  $('fdRemoveBtn').onclick = () => famUnlink(f.chat_id);
 
   const items = st.items || [];
   const box = $('fdItems');
@@ -1154,8 +1180,6 @@ function openFamMember(idx) {
       </div>`;
     }).join('');
   }
-  $('famOv').classList.add('open');
-  try { tg?.BackButton?.show() } catch {}
 }
 function closeFamMember() { $('famOv').classList.remove('open'); try { tg?.BackButton?.hide() } catch {} }
 $('famOv').onclick = e => { if (e.target === $('famOv')) closeFamMember(); };
@@ -1183,12 +1207,12 @@ async function loadFamily() {
     }
   } catch {}
 
-  // Following
+  // Members (unified: following + followers)
   try {
-    const r = await apiFetch(`${API}/api/family/following?uid=${UID}`);
+    const r = await apiFetch(`${API}/api/family/members?uid=${UID}`);
     if (r.ok) {
       const d = await r.json();
-      const list = d.following || [];
+      const list = d.members || [];
       followingCache = list;
       const el = $('famFollowing');
       if (!list.length) {
@@ -1209,7 +1233,7 @@ async function loadFamily() {
               <div class="fam-person-pct">${pct}%</div>
               <div class="fam-person-sub">${taken}/${total}</div>
             </div>
-            <button class="fam-unlink" onclick="event.stopPropagation();famUnlink(${f.chat_id})">✕</button>
+            <div class="fam-chevron">›</div>
           </div>`;
         }).join('');
       }
@@ -1252,10 +1276,10 @@ $('famAddBtn').onclick = async () => {
 
 async function famUnlink(target) {
   haptic();
-  if (!confirm('Отписаться?')) return;
+  if (!confirm('Удалить из семьи?')) return;
   try {
     const r = await apiFetch(`${API}/api/family/follow?uid=${UID}&target=${target}`, { method: 'DELETE' });
-    if (r.ok) { showToast('Отписано'); loadFamily(); }
+    if (r.ok) { showToast('Удалено из семьи'); closeFamMember(); loadFamily(); }
     else showToast('⚠ Ошибка');
   } catch { showToast('⚠ Сервер недоступен'); }
 }

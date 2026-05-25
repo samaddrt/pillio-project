@@ -725,6 +725,47 @@ int main(int argc, char* argv[]) {
             }
         });
 
+        // ── GET /api/family/members?uid= ────────────────────────────
+        // Все связанные пользователи (following ∪ followers, дедупликация)
+        // с полным дневным статусом. Единый список «Моя семья».
+        svr.Get("/api/family/members", [&fam, &profiles](
+                                            const httplib::Request& req,
+                                            httplib::Response& res) {
+            try {
+                auto uid_str = getUid(req);
+                if (uid_str.empty()) {
+                    errorResponse(res, "uid is required", 400);
+                    return;
+                }
+                std::int64_t uid = std::stoll(uid_str);
+
+                // Собираем все связанные chat_id (both directions)
+                auto fwd = fam.following(uid);   // я → они
+                auto rev = fam.followers(uid);    // они → я
+
+                std::map<std::int64_t, std::string> seen;  // chat_id → relation
+                for (const auto& l : fwd) seen[l.target] = l.relation;
+                for (const auto& l : rev) {
+                    if (seen.find(l.follower) == seen.end()) {
+                        seen[l.follower] = l.relation;
+                    }
+                }
+
+                nlohmann::json arr = nlohmann::json::array();
+                for (const auto& [cid, rel] : seen) {
+                    auto tp = fam.profileByChatId(cid);
+                    auto& st = profiles.get(std::to_string(cid));
+                    arr.push_back({{"chat_id", cid},
+                                   {"name", tp ? tp->name : std::string{"?"}},
+                                   {"relation", rel},
+                                   {"status", buildDailyStatus(st)}});
+                }
+                jsonResponse(res, {{"members", arr}});
+            } catch (const std::exception& e) {
+                errorResponse(res, e.what(), 500);
+            }
+        });
+
         // ── GET /api/family/followers?uid= ───────────────────────────
         // Список тех, кто видит мой статус.
         svr.Get("/api/family/followers", [&fam](const httplib::Request& req,
