@@ -2,10 +2,12 @@
 cmake-build-*/
 build/
 
-# Data
+# Data (runtime state — never commit)
 data/store.json
 data/moods.json
 data/bot.json
+data/family.json
+data/profiles/
 
 # Secrets
 bot/.env

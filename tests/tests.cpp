@@ -532,3 +532,77 @@ TEST_CASE("Family — profile validation rejects zero id / empty name") {
     p.name = "";
     CHECK_THROWS_AS(p.validate(), ValidationError);
 }
+
+TEST_CASE("Family — reverse link has empty relation") {
+    std::filesystem::path tmp = "./test_tmp_family_rev.json";
+    {
+        FamilyStore fs(tmp);
+        fs.link(222, 111, "сын");  // 222 называет 111 «сын»
+        // Обратная связь 111 → 222 должна существовать, но без метки.
+        auto following111 = fs.following(111);
+        REQUIRE(following111.size() == 1);
+        CHECK(following111[0].target == 222);
+        CHECK(following111[0].relation == "");
+    }
+    std::filesystem::remove(tmp);
+}
+
+TEST_CASE("Family — profileByUsername (case-insensitive, strips @)") {
+    std::filesystem::path tmp = "./test_tmp_family_uname.json";
+    {
+        FamilyStore fs(tmp);
+        fs.ensureProfile(111, "Мама", "MamaUser");
+        auto p = fs.profileByUsername("@mamauser");
+        REQUIRE(p.has_value());
+        CHECK(p->chat_id == 111);
+        CHECK(fs.profileByUsername("nope").has_value() == false);
+    }
+    std::filesystem::remove(tmp);
+}
+
+TEST_CASE("Family — request create / incoming / accept creates link") {
+    std::filesystem::path tmp = "./test_tmp_family_req.json";
+    {
+        FamilyStore fs(tmp);
+        fs.ensureProfile(111, "Алиса", "alice");
+        fs.ensureProfile(222, "Боб", "bob");
+
+        auto r = fs.addRequest(111, "Алиса", 222, "сестра");
+        CHECK(r.from == 111);
+        CHECK(r.to == 222);
+        CHECK(r.notified == false);
+
+        auto incoming = fs.incomingRequests(222);
+        REQUIRE(incoming.size() == 1);
+        CHECK(incoming[0].id == r.id);
+
+        // Повторный запрос идемпотентен
+        auto r2 = fs.addRequest(111, "Алиса", 222, "сестра");
+        CHECK(r2.id == r.id);
+
+        // Принятие: создаём связь и удаляем запрос
+        auto found = fs.requestById(r.id);
+        REQUIRE(found.has_value());
+        fs.link(found->from, found->to, found->relation);
+        fs.removeRequest(r.id);
+
+        CHECK(fs.incomingRequests(222).empty());
+        auto following = fs.following(111);
+        REQUIRE(following.size() == 1);
+        CHECK(following[0].target == 222);
+        CHECK(following[0].relation == "сестра");
+    }
+    std::filesystem::remove(tmp);
+}
+
+TEST_CASE("Family — cannot request yourself / duplicate when linked") {
+    std::filesystem::path tmp = "./test_tmp_family_req2.json";
+    {
+        FamilyStore fs(tmp);
+        CHECK_THROWS_AS(fs.addRequest(111, "A", 111, "я"), ValidationError);
+        fs.link(111, 222, "брат");
+        // Уже в семье — повторный запрос отклоняется
+        CHECK_THROWS_AS(fs.addRequest(111, "A", 222, "брат"), ValidationError);
+    }
+    std::filesystem::remove(tmp);
+}

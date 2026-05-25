@@ -431,6 +431,28 @@ body {
   transition:.18s;
 }
 .fam-add-btn:active{transform:scale(.95)}
+.fam-add-hint{font-size:11px;color:var(--text2);margin-top:10px;line-height:1.4}
+
+.fam-req{
+  background:var(--card);border:1px solid var(--amber);border-radius:var(--r);
+  padding:14px 15px;margin-bottom:8px;
+}
+.fam-req-txt{font-size:13px;margin-bottom:10px;line-height:1.4}
+.fam-req-txt b{color:var(--amber)}
+.fam-req-actions{display:flex;gap:8px}
+.fam-req-btn{
+  flex:1;padding:9px 0;border:none;border-radius:var(--rsm);
+  font:600 12px var(--ui);cursor:pointer;transition:.18s;
+}
+.fam-req-btn:active{transform:scale(.95)}
+.fam-req-yes{background:linear-gradient(135deg,var(--sage),var(--sage));color:#fff}
+.fam-req-no{background:var(--bg3);color:var(--text2);border:1px solid var(--border2)}
+
+.mood-insight{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:14px 16px;margin-top:10px;font-size:12.5px;color:var(--text2);line-height:1.5;
+}
+.mood-insight b{color:var(--text)}
 
 .fam-person{
   background:var(--card);border:1px solid var(--border);border-radius:var(--r);
@@ -651,6 +673,7 @@ body {
         <button class="mood-btn" data-m="4">🙂</button>
         <button class="mood-btn" data-m="5">😄</button>
       </div>
+      <div class="mood-insight" id="moodInsight" style="display:none"></div>
     </div>
 
     <!-- FAMILY -->
@@ -667,15 +690,36 @@ body {
         </button>
       </div>
 
+      <div id="famRequests"></div>
+
       <div class="fam-add">
-        <div class="fam-add-title">Добавить близкого по коду</div>
-        <div class="fam-add-row" style="margin-bottom:8px">
-          <input id="famInputCode" placeholder="Код (6 символов)" maxlength="6" style="text-transform:uppercase;letter-spacing:2px;font-family:var(--display)">
+        <div class="seg" id="segFamMode" style="margin-bottom:12px">
+          <button type="button" class="seg-btn sel" data-v="username">По @username</button>
+          <button type="button" class="seg-btn" data-v="code">По коду</button>
         </div>
-        <div class="fam-add-row" style="margin-bottom:8px">
-          <input id="famInputRel" placeholder="Кто это? (мама, папа...)">
+
+        <div id="famAddUsername">
+          <div class="fam-add-title">Отправить запрос по @username</div>
+          <div class="fam-add-row" style="margin-bottom:8px">
+            <input id="famInputUser" placeholder="@username" autocapitalize="off" autocomplete="off">
+          </div>
+          <div class="fam-add-row" style="margin-bottom:8px">
+            <input id="famInputUserRel" placeholder="Кто это? (мама, папа...)">
+          </div>
+          <button class="fam-add-btn" id="famReqBtn" style="width:100%">Отправить запрос</button>
+          <div class="fam-add-hint">Близкий должен сначала запустить бота, затем примет запрос в чате.</div>
         </div>
-        <button class="fam-add-btn" id="famAddBtn" style="width:100%">Добавить</button>
+
+        <div id="famAddCode" style="display:none">
+          <div class="fam-add-title">Добавить по коду</div>
+          <div class="fam-add-row" style="margin-bottom:8px">
+            <input id="famInputCode" placeholder="Код (6 символов)" maxlength="6" style="text-transform:uppercase;letter-spacing:2px;font-family:var(--display)">
+          </div>
+          <div class="fam-add-row" style="margin-bottom:8px">
+            <input id="famInputRel" placeholder="Кто это? (мама, папа...)">
+          </div>
+          <button class="fam-add-btn" id="famAddBtn" style="width:100%">Добавить</button>
+        </div>
       </div>
 
       <div class="section-title">Участники</div>
@@ -812,8 +856,25 @@ body {
 <script>
 const API = window.location.origin;
 const tg  = window.Telegram?.WebApp;
-const UID = tg?.initDataUnsafe?.user?.id || '';
-const UNAME = tg?.initDataUnsafe?.user?.first_name || 'Пользователь';
+
+// Идентификатор пользователя. Берём из Telegram, иначе — из localStorage
+// (резерв на случай, когда initDataUnsafe не заполнен), чтобы данные
+// мини-аппа и бота всегда указывали на один и тот же профиль.
+let UID   = tg?.initDataUnsafe?.user?.id || '';
+let UNAME = tg?.initDataUnsafe?.user?.first_name || '';
+let UNICK = tg?.initDataUnsafe?.user?.username || '';
+try {
+  if (UID) {
+    localStorage.setItem('pillio_uid', String(UID));
+    if (UNAME) localStorage.setItem('pillio_uname', UNAME);
+    localStorage.setItem('pillio_unick', UNICK || '');
+  } else {
+    UID   = localStorage.getItem('pillio_uid')   || '';
+    UNAME = localStorage.getItem('pillio_uname') || '';
+    UNICK = localStorage.getItem('pillio_unick') || '';
+  }
+} catch {}
+if (!UNAME) UNAME = 'Пользователь';
 
 // Обёртка fetch — всегда шлёт X-Pillio-Uid для изоляции данных
 function apiFetch(url, opts = {}) {
@@ -827,7 +888,7 @@ if (tg) {
   if (UID) {
     apiFetch(`${API}/api/bot/register`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: UID })
+      body: JSON.stringify({ chat_id: UID, username: UNICK, name: UNAME })
     }).catch(() => {});
   }
 }
@@ -1082,6 +1143,7 @@ async function loadStats() {
     $('stTotal').textContent = scheds.length;
     $('stTaken').textContent = scheds.filter(s => s.taken).length;
     renderWeek();
+    loadMood();
   } catch (e) { console.error(e); }
 }
 
@@ -1112,8 +1174,31 @@ document.querySelectorAll('.mood-btn').forEach(b => b.onclick = async () => {
   try {
     await apiFetch(`${API}/api/mood`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date: todayISO(), mood }) });
     showToast('Самочувствие сохранено');
-  } catch { localStorage.setItem('pillio_mood_' + todayISO(), mood); showToast('Сохранено локально'); }
+    loadMood();
+  } catch { showToast('⚠ Не удалось сохранить'); }
 });
+
+// Загружает отметку настроения за сегодня и инсайт корреляции с приёмом
+async function loadMood() {
+  try {
+    const r = await apiFetch(`${API}/api/mood/insight?date=${todayISO()}`);
+    if (!r.ok) return;
+    const d = await r.json();
+    document.querySelectorAll('.mood-btn').forEach(x =>
+      x.classList.toggle('sel', parseInt(x.dataset.m) === d.today));
+    const ins = $('moodInsight');
+    if (d.sample >= 3 && d.mood_full != null && d.mood_missed != null) {
+      const diff = (d.mood_full - d.mood_missed);
+      const arrow = diff > 0.3 ? '📈' : (diff < -0.3 ? '📉' : '➡️');
+      ins.style.display = 'block';
+      ins.innerHTML = `${arrow} Когда вы принимаете <b>все</b> лекарства, настроение в среднем <b>${d.mood_full.toFixed(1)}</b> из 5. ` +
+                      `В дни пропусков — <b>${d.mood_missed.toFixed(1)}</b>.`;
+    } else {
+      ins.style.display = 'block';
+      ins.innerHTML = `Отмечайте настроение каждый день — через несколько дней Pillio покажет, как приём лекарств влияет на ваше самочувствие.`;
+    }
+  } catch {}
+}
 
 // ── Family ──────────────────────────────────────────────────────────
 let followingCache = [];
@@ -1192,13 +1277,15 @@ function stopFamilyPolling() { if (famPollTimer) { clearInterval(famPollTimer); 
 async function loadFamily() {
   // Ensure profile exists
   try {
-    const r = await apiFetch(`${API}/api/family/me?uid=${UID}&name=${encodeURIComponent(UNAME)}`);
+    const r = await apiFetch(`${API}/api/family/me?uid=${UID}&name=${encodeURIComponent(UNAME)}&username=${encodeURIComponent(UNICK)}`);
     if (r.ok) {
       const d = await r.json();
       $('famCode').textContent = d.share_code || '------';
       $('famName').textContent = d.name || '';
     }
   } catch {}
+
+  loadRequests();
 
   // Members (unified: following + followers)
   try {
@@ -1209,7 +1296,7 @@ async function loadFamily() {
       followingCache = list;
       const el = $('famFollowing');
       if (!list.length) {
-        el.innerHTML = '<div class="empty"><div class="empty-txt">Добавьте близких по коду</div></div>';
+        el.innerHTML = '<div class="empty"><div class="empty-txt">Добавьте близких по @username или коду</div></div>';
       } else {
         el.innerHTML = list.map((f, idx) => {
           const pct = f.status ? Math.round((f.status.progress || 0) * 100) : 0;
@@ -1277,24 +1364,72 @@ async function famUnlink(target) {
   } catch { showToast('⚠ Сервер недоступен'); }
 }
 
-// ── Settings ─────────────────────────────────────────────────────────
-$('setBotLink').onclick = () => {
+// Переключатель «по username / по коду»
+document.querySelectorAll('#segFamMode .seg-btn').forEach(b => b.onclick = () => {
   haptic();
-  const uid = tg?.initDataUnsafe?.user?.id;
-  if (uid) {
-    apiFetch(`${API}/api/bot/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: uid }) })
-      .then(r => { if (r.ok) { try { tg?.HapticFeedback?.notificationOccurred('success') } catch {} showToast('Напоминания подключены!'); } else showToast('⚠ Ошибка'); })
-      .catch(() => showToast('⚠ Сервер недоступен'));
-  } else {
-    const chatId = prompt('Введите ваш Telegram Chat ID:');
-    if (chatId) {
-      apiFetch(`${API}/api/bot/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: parseInt(chatId) }) })
-        .then(r => { if (r.ok) showToast('Бот подключён!'); else showToast('⚠ Ошибка'); })
-        .catch(() => showToast('⚠ Сервер недоступен'));
+  document.querySelectorAll('#segFamMode .seg-btn').forEach(x => x.classList.remove('sel'));
+  b.classList.add('sel');
+  const byUser = b.dataset.v === 'username';
+  $('famAddUsername').style.display = byUser ? 'block' : 'none';
+  $('famAddCode').style.display     = byUser ? 'none'  : 'block';
+});
+
+// Отправка запроса по @username
+$('famReqBtn').onclick = async () => {
+  haptic();
+  let uname = $('famInputUser').value.trim().replace(/^@/, '');
+  const relation = $('famInputUserRel').value.trim();
+  if (!uname)    { showToast('⚠ Введите @username'); return; }
+  if (!relation) { showToast('⚠ Укажите кто это'); return; }
+  try {
+    const r = await apiFetch(`${API}/api/family/request`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: UID, name: UNAME, username: UNICK, target_username: uname, relation })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) {
+      try { tg?.HapticFeedback?.notificationOccurred('success') } catch {}
+      showToast('Запрос отправлен!');
+      $('famInputUser').value = '';
+      $('famInputUserRel').value = '';
+    } else {
+      showToast('⚠ ' + (d.error || 'Ошибка'));
     }
-  }
+  } catch { showToast('⚠ Сервер недоступен'); }
 };
 
+// Входящие запросы на добавление в семью
+async function loadRequests() {
+  try {
+    const r = await apiFetch(`${API}/api/family/requests?uid=${UID}`);
+    if (!r.ok) return;
+    const d = await r.json();
+    const reqs = d.requests || [];
+    const box = $('famRequests');
+    box.innerHTML = reqs.map(q => `
+      <div class="fam-req">
+        <div class="fam-req-txt"><b>${esc(q.from_name)}</b> хочет следить за вашим приёмом лекарств как «${esc(q.relation)}».</div>
+        <div class="fam-req-actions">
+          <button class="fam-req-btn fam-req-yes" onclick="answerRequest('${q.id}', true)">Принять</button>
+          <button class="fam-req-btn fam-req-no" onclick="answerRequest('${q.id}', false)">Отклонить</button>
+        </div>
+      </div>`).join('');
+  } catch {}
+}
+
+async function answerRequest(id, accept) {
+  haptic();
+  try {
+    const r = await apiFetch(`${API}/api/family/request/${accept ? 'accept' : 'decline'}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: UID, name: UNAME, request_id: id })
+    });
+    if (r.ok) { showToast(accept ? 'Принято!' : 'Отклонено'); loadFamily(); }
+    else { const e = await r.json().catch(() => ({})); showToast('⚠ ' + (e.error || 'Ошибка')); }
+  } catch { showToast('⚠ Сервер недоступен'); }
+}
+
+// ── Settings ─────────────────────────────────────────────────────────
 $('setExport').onclick = async () => {
   haptic();
   try {

@@ -37,9 +37,24 @@ namespace {
 
 void parseArgs(int argc, char* argv[],
                std::filesystem::path& db_path,
+               std::filesystem::path& family_path,
                int& port) {
-    db_path = "./data/store.json";
-    port = 8080;
+    // Приоритет: CLI-аргумент > переменная окружения > значение по умолчанию.
+    if (const char* env_db = std::getenv("STORAGE_PATH"); env_db && *env_db) {
+        db_path = env_db;
+    } else {
+        db_path = "./data/store.json";
+    }
+    if (const char* env_fam = std::getenv("FAMILY_STORAGE_PATH"); env_fam && *env_fam) {
+        family_path = env_fam;
+    } else {
+        family_path = "";  // заполним относительно db_path ниже
+    }
+    if (const char* env_port = std::getenv("API_PORT"); env_port && *env_port) {
+        port = std::atoi(env_port);
+    } else {
+        port = 8080;
+    }
 
     std::vector<std::string> args(argv, argv + argc);
     for (std::size_t i = 1; i < args.size(); ++i) {
@@ -51,6 +66,10 @@ void parseArgs(int argc, char* argv[],
             std::cout << "Usage: pillio [--db path] [--port N]\n";
             std::exit(0);
         }
+    }
+
+    if (family_path.empty()) {
+        family_path = db_path.parent_path() / "family.json";
     }
 
     if (port < 1 || port > 65535) {
@@ -70,6 +89,19 @@ void errorResponse(httplib::Response& res,
                    int status = 400) {
     nlohmann::json body = {{"error", message}};
     jsonResponse(res, body, status);
+}
+
+// Безопасно читает JSON-объект из файла; при отсутствии/ошибке — пустой объект.
+nlohmann::json loadJsonFile(const std::filesystem::path& path) {
+    nlohmann::json data = nlohmann::json::object();
+    if (std::filesystem::exists(path)) {
+        std::ifstream ifs(path);
+        if (ifs.is_open()) {
+            try { ifs >> data; } catch (...) { data = nlohmann::json::object(); }
+        }
+    }
+    if (!data.is_object()) data = nlohmann::json::object();
+    return data;
 }
 
 // Кэш Storage-объектов по uid. Пустой uid → файл из --db (localhost-режим),
@@ -206,12 +238,13 @@ nlohmann::json buildDailyStatus(pillio::Storage& st) {
 int main(int argc, char* argv[]) {
     try {
         std::filesystem::path db_path;
+        std::filesystem::path family_path;
         int port{};
-        parseArgs(argc, argv, db_path, port);
+        parseArgs(argc, argv, db_path, family_path, port);
 
         // Менеджер хранилищ по пользователям (multi-tenant) + семейный модуль
         ProfileManager profiles(db_path);
-        pillio::FamilyStore fam(db_path.parent_path() / "family.json");
+        pillio::FamilyStore fam(family_path);
 
         httplib::Server svr;
 
@@ -425,9 +458,12 @@ int main(int argc, char* argv[]) {
         });
 
         // ── POST /api/mood ──────────────────────────────────────────
+        // Настроение хранится per-uid: { "<uid>": { "<date>": mood } }
         svr.Post("/api/mood", [&db_path](const httplib::Request& req,
                                          httplib::Response& res) {
             try {
+                auto uid = getUid(req);
+                if (uid.empty()) { errorResponse(res, "uid is required", 400); return; }
                 auto body = nlohmann::json::parse(req.body);
                 auto date = body.at("date").get<std::string>();
                 auto mood = body.at("mood").get<int>();
@@ -435,16 +471,12 @@ int main(int argc, char* argv[]) {
                     errorResponse(res, "Mood must be 1..5", 422);
                     return;
                 }
-                // Store mood in a separate JSON file
                 auto mood_path = db_path.parent_path() / "moods.json";
-                nlohmann::json moods = nlohmann::json::object();
-                if (std::filesystem::exists(mood_path)) {
-                    std::ifstream ifs(mood_path);
-                    if (ifs.is_open()) {
-                        try { ifs >> moods; } catch (...) {}
-                    }
+                nlohmann::json moods = loadJsonFile(mood_path);
+                if (!moods.contains(uid) || !moods[uid].is_object()) {
+                    moods[uid] = nlohmann::json::object();
                 }
-                moods[date] = mood;
+                moods[uid][date] = mood;
                 std::ofstream ofs(mood_path);
                 ofs << moods.dump(2);
 
@@ -460,17 +492,60 @@ int main(int argc, char* argv[]) {
         svr.Get("/api/mood", [&db_path](const httplib::Request& req,
                                         httplib::Response& res) {
             try {
+                auto uid = getUid(req);
                 auto date = req.get_param_value("date");
                 auto mood_path = db_path.parent_path() / "moods.json";
-                nlohmann::json moods = nlohmann::json::object();
-                if (std::filesystem::exists(mood_path)) {
-                    std::ifstream ifs(mood_path);
-                    if (ifs.is_open()) {
-                        try { ifs >> moods; } catch (...) {}
-                    }
+                nlohmann::json moods = loadJsonFile(mood_path);
+                int mood_val = 0;
+                if (moods.contains(uid) && moods[uid].is_object()) {
+                    mood_val = moods[uid].value(date, 0);
                 }
-                int mood_val = moods.value(date, 0);
                 jsonResponse(res, {{"date", date}, {"mood", mood_val}});
+            } catch (const std::exception& e) {
+                errorResponse(res, e.what(), 500);
+            }
+        });
+
+        // ── GET /api/mood/insight?date= ─────────────────────────────
+        // Корреляция настроения с приёмом: средний балл в дни 100% адгезии
+        // против дней с пропусками. Плюс отметка за сегодня.
+        svr.Get("/api/mood/insight", [&db_path, &profiles](
+                                          const httplib::Request& req,
+                                          httplib::Response& res) {
+            try {
+                auto uid = getUid(req);
+                if (uid.empty()) { errorResponse(res, "uid is required", 400); return; }
+                auto today = req.get_param_value("date");
+
+                auto mood_path = db_path.parent_path() / "moods.json";
+                nlohmann::json moods = loadJsonFile(mood_path);
+                nlohmann::json user_moods = (moods.contains(uid) && moods[uid].is_object())
+                                                ? moods[uid] : nlohmann::json::object();
+
+                auto& st = profiles.get(uid);
+                double sum_full = 0, sum_missed = 0;
+                int n_full = 0, n_missed = 0;
+                for (auto it = user_moods.begin(); it != user_moods.end(); ++it) {
+                    const std::string& date = it.key();
+                    int mood = it.value().is_number() ? it.value().get<int>() : 0;
+                    if (mood < 1) continue;
+                    auto scheds = st.getSchedulesForDate(date);
+                    if (scheds.empty()) continue;  // нечего сопоставлять
+                    bool all_taken = std::all_of(scheds.begin(), scheds.end(),
+                        [](const pillio::Schedule& s) { return s.taken; });
+                    if (all_taken) { sum_full += mood; ++n_full; }
+                    else           { sum_missed += mood; ++n_missed; }
+                }
+
+                int today_mood = 0;
+                if (!today.empty()) today_mood = user_moods.value(today, 0);
+
+                nlohmann::json body = {
+                    {"today", today_mood},
+                    {"sample", n_full + n_missed}};
+                if (n_full > 0)   body["mood_full"]   = sum_full / n_full;   else body["mood_full"] = nullptr;
+                if (n_missed > 0) body["mood_missed"] = sum_missed / n_missed; else body["mood_missed"] = nullptr;
+                jsonResponse(res, body);
             } catch (const std::exception& e) {
                 errorResponse(res, e.what(), 500);
             }
@@ -656,12 +731,14 @@ int main(int argc, char* argv[]) {
                 std::int64_t uid = std::stoll(uid_str);
                 std::string name = req.get_param_value("name");
                 if (name.empty()) name = "Профиль";
+                std::string username = req.get_param_value("username");
 
-                auto prof = fam.ensureProfile(uid, name);
+                auto prof = fam.ensureProfile(uid, name, username);
                 auto& st = profiles.get(uid_str);
                 nlohmann::json body = {{"chat_id", prof.chat_id},
                                        {"name", prof.name},
                                        {"share_code", prof.share_code},
+                                       {"username", prof.username},
                                        {"status", buildDailyStatus(st)}};
                 jsonResponse(res, body);
             } catch (const pillio::ValidationError& e) {
@@ -747,9 +824,11 @@ int main(int argc, char* argv[]) {
                 for (const auto& l : links) {
                     auto tp = fam.profileByChatId(l.target);
                     auto& st = profiles.get(std::to_string(l.target));
+                    std::string pname = tp ? tp->name : std::string{"?"};
                     arr.push_back({{"chat_id", l.target},
-                                   {"name", l.relation},  // how I named them
-                                   {"profile_name", tp ? tp->name : std::string{"?"}},
+                                   // показываем мою метку, иначе настоящее имя
+                                   {"name", l.relation.empty() ? pname : l.relation},
+                                   {"profile_name", pname},
                                    {"relation", l.relation},
                                    {"status", buildDailyStatus(st)}});
                 }
@@ -790,9 +869,11 @@ int main(int argc, char* argv[]) {
                 for (const auto& [cid, rel] : seen) {
                     auto tp = fam.profileByChatId(cid);
                     auto& st = profiles.get(std::to_string(cid));
+                    std::string pname = tp ? tp->name : std::string{"?"};
                     arr.push_back({{"chat_id", cid},
-                                   {"name", rel},  // how I named them
-                                   {"profile_name", tp ? tp->name : std::string{"?"}},
+                                   // показываем мою метку, иначе настоящее имя
+                                   {"name", rel.empty() ? pname : rel},
+                                   {"profile_name", pname},
                                    {"relation", rel},
                                    {"status", buildDailyStatus(st)}});
                 }
@@ -867,6 +948,148 @@ int main(int argc, char* argv[]) {
                     {"overdue", overdue},
                     {"notify", notify}};
                 jsonResponse(res, body);
+            } catch (const std::exception& e) {
+                errorResponse(res, e.what(), 500);
+            }
+        });
+
+        // ── POST /api/family/request ─────────────────────────────────
+        // Запрос на добавление в семью по @username.
+        // body: {uid, name, username, target_username, relation}
+        svr.Post("/api/family/request", [&fam](const httplib::Request& req,
+                                                httplib::Response& res) {
+            try {
+                auto body = nlohmann::json::parse(req.body);
+                auto uid = body.at("uid").get<std::int64_t>();
+                auto myname = body.value("name", std::string{"Пользователь"});
+                auto myuser = body.value("username", std::string{});
+                auto target_username = body.value("target_username", std::string{});
+                auto relation = body.value("relation", std::string{"близкий"});
+                if (target_username.empty()) {
+                    errorResponse(res, "Укажите @username", 422);
+                    return;
+                }
+
+                // Регистрируем свой профиль (с username — чтобы и нас находили).
+                fam.ensureProfile(uid, myname, myuser);
+
+                auto target = fam.profileByUsername(target_username);
+                if (!target) {
+                    errorResponse(res,
+                        "Пользователь не найден. Попросите его открыть приложение "
+                        "или написать боту /start.", 404);
+                    return;
+                }
+                if (target->chat_id == uid) {
+                    errorResponse(res, "Нельзя добавить самого себя", 422);
+                    return;
+                }
+
+                auto r = fam.addRequest(uid, myname, target->chat_id, relation);
+                jsonResponse(res, {{"ok", true},
+                                   {"request_id", r.id},
+                                   {"target_name", target->name}}, 201);
+            } catch (const pillio::ValidationError& e) {
+                errorResponse(res, e.what(), 422);
+            } catch (const nlohmann::json::exception& e) {
+                errorResponse(res, std::string("Invalid JSON: ") + e.what(), 400);
+            } catch (const std::exception& e) {
+                errorResponse(res, e.what(), 500);
+            }
+        });
+
+        // ── GET /api/family/requests?uid= ────────────────────────────
+        // Входящие запросы для пользователя uid.
+        svr.Get("/api/family/requests", [&fam](const httplib::Request& req,
+                                                httplib::Response& res) {
+            try {
+                auto uid_str = getUid(req);
+                if (uid_str.empty()) { errorResponse(res, "uid is required", 400); return; }
+                std::int64_t uid = std::stoll(uid_str);
+                nlohmann::json arr = nlohmann::json::array();
+                for (const auto& r : fam.incomingRequests(uid)) {
+                    arr.push_back({{"id", r.id},
+                                   {"from", r.from},
+                                   {"from_name", r.from_name},
+                                   {"relation", r.relation}});
+                }
+                jsonResponse(res, {{"requests", arr}});
+            } catch (const std::exception& e) {
+                errorResponse(res, e.what(), 500);
+            }
+        });
+
+        // ── GET /api/family/requests/outbox ──────────────────────────
+        // Для бота: запросы, о которых ещё не уведомлён получатель.
+        svr.Get("/api/family/requests/outbox", [&fam](const httplib::Request& /*req*/,
+                                                       httplib::Response& res) {
+            try {
+                nlohmann::json arr = nlohmann::json::array();
+                for (const auto& r : fam.unnotifiedRequests()) {
+                    arr.push_back({{"id", r.id},
+                                   {"from", r.from},
+                                   {"from_name", r.from_name},
+                                   {"to", r.to},
+                                   {"relation", r.relation}});
+                }
+                jsonResponse(res, {{"requests", arr}});
+            } catch (const std::exception& e) {
+                errorResponse(res, e.what(), 500);
+            }
+        });
+
+        // ── POST /api/family/request/notified  body:{request_id} ─────
+        svr.Post("/api/family/request/notified", [&fam](const httplib::Request& req,
+                                                         httplib::Response& res) {
+            try {
+                auto body = nlohmann::json::parse(req.body);
+                fam.markNotified(body.at("request_id").get<std::string>());
+                jsonResponse(res, {{"ok", true}});
+            } catch (const nlohmann::json::exception& e) {
+                errorResponse(res, std::string("Invalid JSON: ") + e.what(), 400);
+            } catch (const std::exception& e) {
+                errorResponse(res, e.what(), 500);
+            }
+        });
+
+        // ── POST /api/family/request/accept  body:{request_id, name} ─
+        // Подтверждение получателем: создаётся связь from → to.
+        svr.Post("/api/family/request/accept", [&fam](const httplib::Request& req,
+                                                       httplib::Response& res) {
+            try {
+                auto body = nlohmann::json::parse(req.body);
+                auto id = body.at("request_id").get<std::string>();
+                auto r = fam.requestById(id);
+                if (!r) { errorResponse(res, "Запрос не найден", 404); return; }
+                // Получатель подтверждает свой профиль (имя, если передано).
+                auto myname = body.value("name", std::string{});
+                if (!myname.empty()) fam.ensureProfile(r->to, myname);
+                fam.link(r->from, r->to, r->relation);
+                fam.removeRequest(id);
+                jsonResponse(res, {{"ok", true},
+                                   {"from", r->from},
+                                   {"from_name", r->from_name},
+                                   {"relation", r->relation}});
+            } catch (const nlohmann::json::exception& e) {
+                errorResponse(res, std::string("Invalid JSON: ") + e.what(), 400);
+            } catch (const std::exception& e) {
+                errorResponse(res, e.what(), 500);
+            }
+        });
+
+        // ── POST /api/family/request/decline  body:{request_id} ──────
+        svr.Post("/api/family/request/decline", [&fam](const httplib::Request& req,
+                                                        httplib::Response& res) {
+            try {
+                auto body = nlohmann::json::parse(req.body);
+                auto id = body.at("request_id").get<std::string>();
+                auto r = fam.requestById(id);
+                fam.removeRequest(id);
+                nlohmann::json out = {{"ok", true}};
+                if (r) { out["from"] = r->from; out["from_name"] = r->from_name; }
+                jsonResponse(res, out);
+            } catch (const nlohmann::json::exception& e) {
+                errorResponse(res, std::string("Invalid JSON: ") + e.what(), 400);
             } catch (const std::exception& e) {
                 errorResponse(res, e.what(), 500);
             }

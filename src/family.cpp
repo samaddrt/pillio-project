@@ -20,6 +20,29 @@ std::string toUpper(std::string s) {
     return s;
 }
 
+std::string toLower(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    return s;
+}
+
+// Нормализует @username: убирает ведущий @ и приводит к нижнему регистру.
+std::string normUsername(std::string s) {
+    if (!s.empty() && s.front() == '@') s.erase(s.begin());
+    return toLower(std::move(s));
+}
+
+// Генерирует случайный идентификатор запроса (12 hex-символов).
+std::string makeRequestId() {
+    static const char hex[] = "0123456789abcdef";
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<int> dist(0, 15);
+    std::string id;
+    for (int i = 0; i < 12; ++i) id += hex[dist(gen)];
+    return id;
+}
+
 }  // namespace
 
 FamilyStore::FamilyStore(std::filesystem::path path) : path_(std::move(path)) {
@@ -34,7 +57,8 @@ FamilyStore::FamilyStore(std::filesystem::path path) : path_(std::move(path)) {
 
     if (!std::filesystem::exists(path_)) {
         nlohmann::json initial = {{"profiles", nlohmann::json::array()},
-                                  {"links", nlohmann::json::array()}};
+                                  {"links", nlohmann::json::array()},
+                                  {"requests", nlohmann::json::array()}};
         save(initial);
     }
 }
@@ -49,6 +73,7 @@ nlohmann::json FamilyStore::load() const {
         ifs >> data;
         if (!data.contains("profiles")) data["profiles"] = nlohmann::json::array();
         if (!data.contains("links")) data["links"] = nlohmann::json::array();
+        if (!data.contains("requests")) data["requests"] = nlohmann::json::array();
         return data;
     } catch (const nlohmann::json::parse_error& e) {
         throw StorageError(std::string("Corrupted family file: ") + e.what());
@@ -92,16 +117,21 @@ std::string FamilyStore::generateCode(const nlohmann::json& data) const {
 
 // Профили
 
-Profile FamilyStore::ensureProfile(std::int64_t chat_id, const std::string& name) {
+Profile FamilyStore::ensureProfile(std::int64_t chat_id, const std::string& name,
+                                   const std::string& username) {
+    auto uname = normUsername(username);
+
     Profile candidate;
     candidate.chat_id = chat_id;
     candidate.name = name;
+    candidate.username = uname;
     candidate.validate();
 
     auto data = load();
     for (auto& p : data["profiles"]) {
         if (p.value("chat_id", static_cast<std::int64_t>(0)) == chat_id) {
             if (!name.empty()) p["name"] = name;
+            if (!uname.empty()) p["username"] = uname;
             if (p.value("share_code", std::string{}).empty()) {
                 p["share_code"] = generateCode(data);
             }
@@ -131,6 +161,18 @@ std::optional<Profile> FamilyStore::profileByChatId(std::int64_t chat_id) const 
     auto data = load();
     for (const auto& p : data["profiles"]) {
         if (p.value("chat_id", static_cast<std::int64_t>(0)) == chat_id) {
+            return p.get<Profile>();
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<Profile> FamilyStore::profileByUsername(const std::string& username) const {
+    auto norm = normUsername(username);
+    if (norm.empty()) return std::nullopt;
+    auto data = load();
+    for (const auto& p : data["profiles"]) {
+        if (toLower(p.value("username", std::string{})) == norm) {
             return p.get<Profile>();
         }
     }
@@ -175,10 +217,12 @@ void FamilyStore::link(std::int64_t follower, std::int64_t target,
         }
     }
     if (!foundBA) {
+        // Обратная связь создаётся с пустой меткой: получатель сам не давал
+        // имени отправителю (иначе он видел бы себя «мамой» и т.п.).
         FamilyLink rev;
         rev.follower = target;
         rev.target = follower;
-        rev.relation = relation;
+        rev.relation = "";
         rev.created_at = now_str;
         rev.validate();
         data["links"].push_back(rev);
@@ -224,6 +268,102 @@ std::vector<FamilyLink> FamilyStore::followers(std::int64_t target) const {
         }
     }
     return result;
+}
+
+// Запросы
+
+FamilyRequest FamilyStore::addRequest(std::int64_t from, const std::string& from_name,
+                                      std::int64_t to, const std::string& relation) {
+    if (from == 0 || to == 0) {
+        throw ValidationError("Request requires non-zero from/to");
+    }
+    if (from == to) {
+        throw ValidationError("Cannot request yourself");
+    }
+
+    auto data = load();
+
+    // Если уже подписан — нет смысла слать запрос.
+    for (const auto& e : data["links"]) {
+        if (e.value("follower", static_cast<std::int64_t>(0)) == from &&
+            e.value("target", static_cast<std::int64_t>(0)) == to) {
+            throw ValidationError("Already in your family");
+        }
+    }
+
+    // Идемпотентность: возвращаем существующий pending-запрос from → to.
+    for (const auto& e : data["requests"]) {
+        if (e.value("from", static_cast<std::int64_t>(0)) == from &&
+            e.value("to", static_cast<std::int64_t>(0)) == to) {
+            return e.get<FamilyRequest>();
+        }
+    }
+
+    FamilyRequest r;
+    r.id = makeRequestId();
+    r.from = from;
+    r.from_name = from_name.empty() ? std::string{"Пользователь"} : from_name;
+    r.to = to;
+    r.relation = relation;
+    r.created_at = formatTimePoint(Clock::now());
+    r.notified = false;
+    data["requests"].push_back(r);
+    save(data);
+    return r;
+}
+
+std::vector<FamilyRequest> FamilyStore::incomingRequests(std::int64_t to) const {
+    auto data = load();
+    std::vector<FamilyRequest> result;
+    for (const auto& e : data["requests"]) {
+        if (e.value("to", static_cast<std::int64_t>(0)) == to) {
+            result.push_back(e.get<FamilyRequest>());
+        }
+    }
+    return result;
+}
+
+std::vector<FamilyRequest> FamilyStore::unnotifiedRequests() const {
+    auto data = load();
+    std::vector<FamilyRequest> result;
+    for (const auto& e : data["requests"]) {
+        if (!e.value("notified", false)) {
+            result.push_back(e.get<FamilyRequest>());
+        }
+    }
+    return result;
+}
+
+std::optional<FamilyRequest> FamilyStore::requestById(const std::string& id) const {
+    auto data = load();
+    for (const auto& e : data["requests"]) {
+        if (e.value("id", std::string{}) == id) {
+            return e.get<FamilyRequest>();
+        }
+    }
+    return std::nullopt;
+}
+
+void FamilyStore::markNotified(const std::string& id) {
+    auto data = load();
+    for (auto& e : data["requests"]) {
+        if (e.value("id", std::string{}) == id) {
+            e["notified"] = true;
+            break;
+        }
+    }
+    save(data);
+}
+
+void FamilyStore::removeRequest(const std::string& id) {
+    auto data = load();
+    auto& reqs = data["requests"];
+    reqs.erase(std::remove_if(reqs.begin(), reqs.end(),
+                              [&id](const nlohmann::json& e) {
+                                  return e.value("id", std::string{}) == id;
+                              }),
+               reqs.end());
+    save(data);
 }
 
 }  // namespace pillio
