@@ -15,14 +15,15 @@ g++ -std=c++20 -O2 -I src -I third_party \
     -o build/pillio -lpthread 2>&1
 echo "Build OK"
 
-# Install Python deps
-pip install -q -r bot/requirements.txt 2>/dev/null || true
+# Install Python deps to /tmp/pylibs (works in nix env)
+pip install --target /tmp/pylibs -q -r bot/requirements.txt 2>/dev/null || \
+  pip install --user -q -r bot/requirements.txt 2>/dev/null || true
 
 # Start both processes
 ./build/pillio &
 SERVER_PID=$!
 
-python3 bot/bot.py &
+PYTHONPATH=/tmp/pylibs python3 bot/bot.py &
 BOT_PID=$!
 
 echo "Server PID: $SERVER_PID"
