@@ -5,9 +5,9 @@
     pkgs.openssl
     pkgs.pkg-config
     pkgs.gnumake
-    pkgs.python311
-    pkgs.python311Packages.pip
-    (pkgs.python311.withPackages (ps: [
+    pkgs.python310
+    pkgs.python310Packages.pip
+    (pkgs.python310.withPackages (ps: [
       ps.python-telegram-bot
       ps.requests
       ps.python-dotenv
