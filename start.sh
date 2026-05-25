@@ -6,15 +6,17 @@ pkill -f './build/pillio' 2>/dev/null || true
 pkill -f 'bot/bot.py' 2>/dev/null || true
 sleep 1
 
-# Build C++ server
+# Build C++ server (direct g++ — no cmake needed)
 mkdir -p build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release 2>&1
-make -j$(nproc) 2>&1
-cd ..
+echo "Building pillio..."
+g++ -std=c++20 -O2 -I src -I third_party \
+    src/main.cpp src/tracker.cpp src/storage.cpp \
+    src/analytics.cpp src/checker.cpp src/family.cpp \
+    -o build/pillio -lpthread 2>&1
+echo "Build OK"
 
 # Install Python deps
-pip install -q -r bot/requirements.txt 2>/dev/null
+pip install -q -r bot/requirements.txt 2>/dev/null || true
 
 # Start both processes
 ./build/pillio &
