@@ -48,25 +48,31 @@ logger = logging.getLogger("pillio_bot")
 
 # ── Вспомогательные функции ───────────────────────────────────────
 
-def api_get(path: str) -> dict | list | None:
-    """GET-запрос к C++ API."""
+def api_get(path: str, uid: str = "") -> dict | list | None:
+    """GET-запрос к C++ API с X-Pillio-Uid header."""
     try:
-        r = requests.get(f"{API_URL}{path}", timeout=5)
+        headers = {}
+        if uid:
+            headers["X-Pillio-Uid"] = uid
+        r = requests.get(f"{API_URL}{path}", headers=headers, timeout=5)
         r.raise_for_status()
         return r.json()
     except Exception as e:
-        logger.error("API GET %s failed: %s", path, e)
+        logger.error("API GET %s (uid=%s) failed: %s", path, uid, e)
         return None
 
 
-def api_post(path: str, data: dict) -> dict | None:
-    """POST-запрос к C++ API."""
+def api_post(path: str, data: dict, uid: str = "") -> dict | None:
+    """POST-запрос к C++ API с X-Pillio-Uid header."""
     try:
-        r = requests.post(f"{API_URL}{path}", json=data, timeout=5)
+        headers = {}
+        if uid:
+            headers["X-Pillio-Uid"] = uid
+        r = requests.post(f"{API_URL}{path}", json=data, headers=headers, timeout=5)
         r.raise_for_status()
         return r.json()
     except Exception as e:
-        logger.error("API POST %s failed: %s", path, e)
+        logger.error("API POST %s (uid=%s) failed: %s", path, uid, e)
         return None
 
 
@@ -94,10 +100,11 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Приветствие + кнопка Mini App."""
     user = update.effective_user
     name = user.first_name if user else "друг"
-
-    # Регистрируем chat_id на сервере для напоминаний
+    uid = str(user.id) if user else ""
     chat_id = update.effective_chat.id
-    api_post("/api/bot/register", {"chat_id": chat_id})
+
+    # Регистрируем telegram_id -> chat_id маппинг на сервере для напоминаний
+    api_post("/api/bot/register", {"telegram_id": uid, "chat_id": chat_id}, uid=uid)
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton(
@@ -138,7 +145,8 @@ async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_today(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Показывает сводку приёмов на сегодня."""
-    data = api_get(f"/api/schedule?date={today_iso()}")
+    uid = str(update.effective_user.id) if update.effective_user else ""
+    data = api_get(f"/api/schedule?date={today_iso()}", uid=uid)
     if not data:
         await update.message.reply_text("⚠️ Не удалось получить данные с сервера.")
         return
@@ -172,7 +180,7 @@ async def cmd_today(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         lines.append(f"{status} {time_str} — *{name}* {dose} {unit}{meal_tag}")
 
     # Статистика
-    stats = api_get("/api/stats")
+    stats = api_get("/api/stats", uid=uid)
     if stats:
         streak = stats.get("streak", 0)
         if streak > 0:
@@ -194,7 +202,8 @@ async def cmd_today(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_pills(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Показывает список лекарств."""
-    pills = api_get("/api/pills")
+    uid = str(update.effective_user.id) if update.effective_user else ""
+    pills = api_get("/api/pills", uid=uid)
     if not pills:
         await update.message.reply_text(
             "📭 Лекарств пока нет. Добавьте через приложение!"
@@ -224,16 +233,17 @@ async def cmd_pills(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_remind(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Принудительно проверяет и отправляет напоминания."""
-    await check_and_send_reminders(ctx.bot, force_chat=update.effective_chat.id)
+    uid = str(update.effective_user.id) if update.effective_user else ""
+    await check_and_send_reminders(ctx.bot, uid=uid)
     await update.message.reply_text("🔔 Проверка напоминаний выполнена!")
 
 
 async def cmd_family(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Показывает семейный код и статус близких."""
-    chat_id = update.effective_chat.id
+    uid = str(update.effective_user.id) if update.effective_user else ""
     name = update.effective_user.first_name if update.effective_user else "Профиль"
 
-    me = api_get(f"/api/family/me?uid={chat_id}&name={name}")
+    me = api_get("/api/family/me", uid=uid)
     if not me:
         await update.message.reply_text("⚠️ Не удалось получить данные.")
         return
@@ -246,7 +256,7 @@ async def cmd_family(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ]
 
     # Following
-    fdata = api_get(f"/api/family/following?uid={chat_id}")
+    fdata = api_get("/api/family/following", uid=uid)
     following = fdata.get("following", []) if fdata else []
     if following:
         lines.append("👀 *Я слежу за:*")
@@ -269,14 +279,17 @@ async def cmd_family(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── Фоновые напоминания ──────────────────────────────────────────
 
-async def check_and_send_reminders(bot, force_chat: int | None = None):
+async def check_and_send_reminders(bot, uid: str = ""):
     """
     Проверяет непринятые лекарства и отправляет напоминания.
     Вызывается каждые 60 секунд или по команде /remind.
     """
     try:
+        if not uid:
+            return
+
         # Получаем непринятые лекарства
-        reminders_data = api_get("/api/bot/reminders")
+        reminders_data = api_get("/api/bot/reminders", uid=uid)
         if not reminders_data:
             return
 
@@ -284,20 +297,20 @@ async def check_and_send_reminders(bot, force_chat: int | None = None):
         if not reminders:
             return
 
-        # Получаем chat_id
+        # Получаем telegram_id и chat_id из bot.json
         bot_data_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "..", "data", "bot.json"
         )
 
-        chat_id = force_chat
-        if not chat_id:
-            try:
-                import json
-                with open(bot_data_path, "r") as f:
-                    bot_cfg = json.load(f)
-                    chat_id = bot_cfg.get("chat_id")
-            except Exception:
-                return
+        chat_id = None
+        try:
+            import json
+            with open(bot_data_path, "r") as f:
+                bot_cfg = json.load(f)
+                # bot.json хранит mapping: {uid: chat_id}
+                chat_id = bot_cfg.get(uid)
+        except Exception:
+            return
 
         if not chat_id:
             return
@@ -355,7 +368,7 @@ async def check_family_digests(bot):
     о пропущенных лекарствах их близких.
     """
     try:
-        # Get all registered chat_ids from bot.json
+        # Get all registered users from bot.json
         bot_data_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "..", "data", "bot.json"
         )
@@ -366,46 +379,48 @@ async def check_family_digests(bot):
         except Exception:
             return
 
-        # Check digest for the registered user
-        chat_id = bot_cfg.get("chat_id")
-        if not chat_id:
-            return
+        # Iterate through all registered users
+        for uid, chat_id in bot_cfg.items():
+            if uid == "_meta":  # Skip metadata
+                continue
+            if not chat_id:
+                continue
 
-        digest = api_get(f"/api/family/digest?uid={chat_id}")
-        if not digest:
-            return
+            digest = api_get("/api/family/digest", uid=uid)
+            if not digest:
+                continue
 
-        overdue = digest.get("overdue", [])
-        notify = digest.get("notify", [])
+            overdue = digest.get("overdue", [])
+            notify = digest.get("notify", [])
 
-        # Send notifications to followers about overdue meds
-        if overdue and notify:
-            # Get user's name
-            me = api_get(f"/api/family/me?uid={chat_id}&name=Профиль")
-            user_name = me.get("name", "Близкий") if me else "Близкий"
+            # Send notifications to followers about overdue meds
+            if overdue and notify:
+                # Get user's name
+                me = api_get("/api/family/me", uid=uid)
+                user_name = me.get("name", "Близкий") if me else "Близкий"
 
-            lines = [f"⚠️ *{user_name}* пропускает лекарства:\n"]
-            for pill_name in overdue:
-                lines.append(f"  💊 {pill_name}")
-            lines.append("\n_Свяжитесь, чтобы напомнить о приёме_")
+                lines = [f"⚠️ *{user_name}* пропускает лекарства:\n"]
+                for pill_name in overdue:
+                    lines.append(f"  💊 {pill_name}")
+                lines.append("\n_Свяжитесь, чтобы напомнить о приёме_")
 
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton(
-                    "👀 Посмотреть подробнее",
-                    web_app=WebAppInfo(url=WEBAPP_URL),
-                )],
-            ])
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton(
+                        "👀 Посмотреть подробнее",
+                        web_app=WebAppInfo(url=WEBAPP_URL),
+                    )],
+                ])
 
-            for follower_id in notify:
-                try:
-                    await bot.send_message(
-                        chat_id=follower_id,
-                        text="\n".join(lines),
-                        parse_mode="Markdown",
-                        reply_markup=keyboard,
-                    )
-                except Exception as e:
-                    logger.warning("Failed to notify follower %s: %s", follower_id, e)
+                for follower_id in notify:
+                    try:
+                        await bot.send_message(
+                            chat_id=follower_id,
+                            text="\n".join(lines),
+                            parse_mode="Markdown",
+                            reply_markup=keyboard,
+                        )
+                    except Exception as e:
+                        logger.warning("Failed to notify follower %s: %s", follower_id, e)
 
     except Exception as e:
         logger.error("Family digest check failed: %s", e)

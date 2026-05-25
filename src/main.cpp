@@ -477,11 +477,12 @@ int main(int argc, char* argv[]) {
         });
 
         // ── POST /api/bot/register ──────────────────────────────────
+        // Saves mapping: telegram_id -> chat_id (from bot.json)
         svr.Post("/api/bot/register", [&db_path](const httplib::Request& req,
                                                   httplib::Response& res) {
             try {
                 auto body = nlohmann::json::parse(req.body);
-                auto chat_id = body.at("chat_id").get<std::int64_t>();
+                auto telegram_id = body.at("telegram_id").get<std::string>();
                 auto bot_path = db_path.parent_path() / "bot.json";
                 nlohmann::json bot_data = nlohmann::json::object();
                 if (std::filesystem::exists(bot_path)) {
@@ -490,12 +491,14 @@ int main(int argc, char* argv[]) {
                         try { ifs >> bot_data; } catch (...) {}
                     }
                 }
-                bot_data["chat_id"] = chat_id;
-                bot_data["registered_at"] = pillio::formatTimePoint(
-                    pillio::Clock::now());
+                // Get chat_id from request body (passed by bot before sending messages)
+                auto chat_id = body.value("chat_id", "");
+                bot_data[telegram_id] = chat_id;
+                bot_data["_meta"] = {{"updated_at", pillio::formatTimePoint(
+                    pillio::Clock::now())}};
                 std::ofstream ofs(bot_path);
                 ofs << bot_data.dump(2);
-                jsonResponse(res, {{"ok", true}, {"chat_id", chat_id}});
+                jsonResponse(res, {{"ok", true}});
             } catch (const nlohmann::json::exception& e) {
                 errorResponse(res, std::string("Invalid JSON: ") + e.what(), 400);
             } catch (const std::exception& e) {
@@ -699,6 +702,7 @@ int main(int argc, char* argv[]) {
 
         // ── GET /api/family/following?uid= ───────────────────────────
         // Список профилей, за которыми я слежу, с их дневным статусом.
+        // name = как я их назвал (relation), profile_name = их настоящее имя
         svr.Get("/api/family/following", [&fam, &profiles](
                                              const httplib::Request& req,
                                              httplib::Response& res) {
@@ -715,7 +719,8 @@ int main(int argc, char* argv[]) {
                     auto tp = fam.profileByChatId(l.target);
                     auto& st = profiles.get(std::to_string(l.target));
                     arr.push_back({{"chat_id", l.target},
-                                   {"name", tp ? tp->name : std::string{"?"}},
+                                   {"name", l.relation},  // how I named them
+                                   {"profile_name", tp ? tp->name : std::string{"?"}},
                                    {"relation", l.relation},
                                    {"status", buildDailyStatus(st)}});
                 }
@@ -728,6 +733,7 @@ int main(int argc, char* argv[]) {
         // ── GET /api/family/members?uid= ────────────────────────────
         // Все связанные пользователи (following ∪ followers, дедупликация)
         // с полным дневным статусом. Единый список «Моя семья».
+        // name = как я их назвал (relation), profile_name = их настоящее имя
         svr.Get("/api/family/members", [&fam, &profiles](
                                             const httplib::Request& req,
                                             httplib::Response& res) {
@@ -756,7 +762,8 @@ int main(int argc, char* argv[]) {
                     auto tp = fam.profileByChatId(cid);
                     auto& st = profiles.get(std::to_string(cid));
                     arr.push_back({{"chat_id", cid},
-                                   {"name", tp ? tp->name : std::string{"?"}},
+                                   {"name", rel},  // how I named them
+                                   {"profile_name", tp ? tp->name : std::string{"?"}},
                                    {"relation", rel},
                                    {"status", buildDailyStatus(st)}});
                 }
