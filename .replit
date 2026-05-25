@@ -2,7 +2,8 @@ run = "bash start.sh"
 entrypoint = "src/main.cpp"
 
 [deployment]
-run = ["sh", "-c", "bash start.sh"]
+build = ["sh", "-c", "mkdir -p build && g++ -std=c++20 -O2 -I src -I third_party src/main.cpp src/tracker.cpp src/storage.cpp src/analytics.cpp src/checker.cpp src/family.cpp -o build/pillio -lpthread 2>&1 && pip install -q -r bot/requirements.txt 2>/dev/null || true"]
+run = ["sh", "-c", "./build/pillio & python3 bot/bot.py & wait"]
 deploymentTarget = "cloudrun"
 
 [[ports]]
