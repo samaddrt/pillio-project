@@ -492,8 +492,12 @@ int main(int argc, char* argv[]) {
                     }
                 }
                 // Get chat_id from request body (passed by bot before sending messages)
-                auto chat_id = body.value("chat_id", "");
-                bot_data[telegram_id] = chat_id;
+                // Store as-is to preserve type (int or string)
+                if (body.contains("chat_id")) {
+                    bot_data[telegram_id] = body["chat_id"];
+                } else {
+                    bot_data[telegram_id] = "";
+                }
                 bot_data["_meta"] = {{"updated_at", pillio::formatTimePoint(
                     pillio::Clock::now())}};
                 std::ofstream ofs(bot_path);
@@ -532,6 +536,31 @@ int main(int argc, char* argv[]) {
                     }
                 }
                 jsonResponse(res, {{"reminders", pending}});
+            } catch (const std::exception& e) {
+                errorResponse(res, e.what(), 500);
+            }
+        });
+
+        // ── GET /api/bot/users ─────────────────────────────────────────
+        // Returns all registered users: {users: {uid: chat_id, ...}}
+        svr.Get("/api/bot/users", [&db_path](const httplib::Request& /*req*/,
+                                             httplib::Response& res) {
+            try {
+                auto bot_path = db_path.parent_path() / "bot.json";
+                nlohmann::json bot_data = nlohmann::json::object();
+                if (std::filesystem::exists(bot_path)) {
+                    std::ifstream ifs(bot_path);
+                    if (ifs.is_open()) {
+                        try { ifs >> bot_data; } catch (...) {}
+                    }
+                }
+                nlohmann::json users = nlohmann::json::object();
+                for (auto& [key, val] : bot_data.items()) {
+                    if (key != "_meta") {
+                        users[key] = val;
+                    }
+                }
+                jsonResponse(res, {{"users", users}});
             } catch (const std::exception& e) {
                 errorResponse(res, e.what(), 500);
             }

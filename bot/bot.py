@@ -234,7 +234,8 @@ async def cmd_pills(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_remind(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Принудительно проверяет и отправляет напоминания."""
     uid = str(update.effective_user.id) if update.effective_user else ""
-    await check_and_send_reminders(ctx.bot, uid=uid)
+    chat_id = update.effective_chat.id
+    await check_and_send_reminders(ctx.bot, uid=uid, chat_id=chat_id)
     await update.message.reply_text("🔔 Проверка напоминаний выполнена!")
 
 
@@ -279,13 +280,14 @@ async def cmd_family(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── Фоновые напоминания ──────────────────────────────────────────
 
-async def check_and_send_reminders(bot, uid: str = ""):
+async def check_and_send_reminders(bot, uid: str = "", chat_id=None):
     """
     Проверяет непринятые лекарства и отправляет напоминания.
     Вызывается каждые 60 секунд или по команде /remind.
+    chat_id передаётся напрямую — не читается из файла.
     """
     try:
-        if not uid:
+        if not uid or chat_id is None:
             return
 
         # Получаем непринятые лекарства
@@ -295,24 +297,6 @@ async def check_and_send_reminders(bot, uid: str = ""):
 
         reminders = reminders_data.get("reminders", [])
         if not reminders:
-            return
-
-        # Получаем telegram_id и chat_id из bot.json
-        bot_data_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "..", "data", "bot.json"
-        )
-
-        chat_id = None
-        try:
-            import json
-            with open(bot_data_path, "r") as f:
-                bot_cfg = json.load(f)
-                # bot.json хранит mapping: {uid: chat_id}
-                chat_id = bot_cfg.get(uid)
-        except Exception:
-            return
-
-        if not chat_id:
             return
 
         now = datetime.now()
@@ -335,7 +319,6 @@ async def check_and_send_reminders(bot, uid: str = ""):
             unit = r.get("pill_unit", "")
             time_str = r.get("scheduled_time", "")[11:16]
             meal = r.get("meal_relation", "none")
-            # Smart contextual message based on meal relation
             if meal in MEAL_HINTS:
                 hint = MEAL_HINTS[meal]
                 lines.append(f"💊 *{name}* {dose} {unit} — {time_str}\n    🍽 _Примите {hint}_")
@@ -359,30 +342,23 @@ async def check_and_send_reminders(bot, uid: str = ""):
         )
 
     except Exception as e:
-        logger.error("Reminder check failed: %s", e)
+        logger.error("Reminder check failed for uid=%s: %s", uid, e)
 
 
 async def check_family_digests(bot):
     """
     Проверяет дайджесты семейного модуля и уведомляет подписчиков
     о пропущенных лекарствах их близких.
+    Использует API /api/bot/users вместо прямого чтения файла.
     """
     try:
-        # Get all registered users from bot.json
-        bot_data_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "..", "data", "bot.json"
-        )
-        try:
-            import json
-            with open(bot_data_path, "r") as f:
-                bot_cfg = json.load(f)
-        except Exception:
+        # Получаем всех зарегистрированных пользователей через API
+        users_data = api_get("/api/bot/users")
+        if not users_data:
             return
+        users = users_data.get("users", {})
 
-        # Iterate through all registered users
-        for uid, chat_id in bot_cfg.items():
-            if uid == "_meta":  # Skip metadata
-                continue
+        for uid, chat_id in users.items():
             if not chat_id:
                 continue
 
@@ -393,14 +369,14 @@ async def check_family_digests(bot):
             overdue = digest.get("overdue", [])
             notify = digest.get("notify", [])
 
-            # Send notifications to followers about overdue meds
+            # Уведомляем подписчиков о просроченных лекарствах
             if overdue and notify:
-                # Get user's name
                 me = api_get("/api/family/me", uid=uid)
                 user_name = me.get("name", "Близкий") if me else "Близкий"
 
                 lines = [f"⚠️ *{user_name}* пропускает лекарства:\n"]
-                for pill_name in overdue:
+                for item in overdue:
+                    pill_name = item.get("pill_name", "?") if isinstance(item, dict) else str(item)
                     lines.append(f"  💊 {pill_name}")
                 lines.append("\n_Свяжитесь, чтобы напомнить о приёме_")
 
@@ -411,16 +387,22 @@ async def check_family_digests(bot):
                     )],
                 ])
 
-                for follower_id in notify:
+                for follower_info in notify:
                     try:
-                        await bot.send_message(
-                            chat_id=follower_id,
-                            text="\n".join(lines),
-                            parse_mode="Markdown",
-                            reply_markup=keyboard,
+                        follower_chat_id = (
+                            follower_info.get("chat_id")
+                            if isinstance(follower_info, dict)
+                            else follower_info
                         )
+                        if follower_chat_id:
+                            await bot.send_message(
+                                chat_id=follower_chat_id,
+                                text="\n".join(lines),
+                                parse_mode="Markdown",
+                                reply_markup=keyboard,
+                            )
                     except Exception as e:
-                        logger.warning("Failed to notify follower %s: %s", follower_id, e)
+                        logger.warning("Failed to notify follower: %s", e)
 
     except Exception as e:
         logger.error("Family digest check failed: %s", e)
@@ -431,7 +413,13 @@ async def reminder_loop(app: Application):
     while True:
         await asyncio.sleep(60)
         try:
-            await check_and_send_reminders(app.bot)
+            # Получаем всех зарегистрированных пользователей через API
+            users_data = api_get("/api/bot/users")
+            if users_data:
+                users = users_data.get("users", {})
+                for uid, chat_id in users.items():
+                    if chat_id:
+                        await check_and_send_reminders(app.bot, uid=uid, chat_id=chat_id)
             await check_family_digests(app.bot)
         except Exception as e:
             logger.error("Reminder loop error: %s", e)
