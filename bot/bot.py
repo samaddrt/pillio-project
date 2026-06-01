@@ -24,6 +24,8 @@ from datetime import datetime
 
 import requests
 from dotenv import load_dotenv
+
+import persist  # durable snapshot of the data dir into Replit Object Storage
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -523,6 +525,12 @@ async def background_loop(app: Application):
             await deliver_family_requests(app.bot)
         except Exception as e:
             logger.error("background loop error: %s", e)
+        # Сохраняем снимок данных во внешнее хранилище, если что-то изменилось.
+        # Выполняем в отдельном потоке, чтобы не блокировать event loop.
+        try:
+            await asyncio.to_thread(persist.backup_if_changed)
+        except Exception as e:
+            logger.warning("persist backup error: %s", e)
 
 
 # ── Запуск ────────────────────────────────────────────────────────
@@ -549,6 +557,8 @@ def main():
             BotCommand("family", "Моя семья"),
             BotCommand("help", "Справка"),
         ])
+        # Базовая линия для бэкапов: данные уже восстановлены run-командой.
+        persist.mark_clean()
         asyncio.create_task(background_loop(application))
         logger.info("✅ Pillio Bot запущен!")
         logger.info("   API: %s", API_URL)

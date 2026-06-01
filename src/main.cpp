@@ -104,6 +104,31 @@ nlohmann::json loadJsonFile(const std::filesystem::path& path) {
     return data;
 }
 
+// Атомарная запись JSON: пишем во временный файл и атомарно переименовываем.
+// Это гарантирует, что внешний бэкап (Object Storage) никогда не прочитает
+// наполовину записанный файл, и защищает от повреждения при падении процесса.
+void saveJsonFileAtomic(const std::filesystem::path& path,
+                        const nlohmann::json& data) {
+    std::filesystem::path tmp = path;
+    tmp += ".tmp";
+    {
+        std::ofstream ofs(tmp, std::ios::trunc);
+        if (!ofs.is_open()) {
+            throw pillio::StorageError("Cannot write file: " + path.string());
+        }
+        ofs << data.dump(2);
+        if (ofs.fail()) {
+            throw pillio::StorageError("Write failed for: " + path.string());
+        }
+    }
+    std::error_code ec;
+    std::filesystem::rename(tmp, path, ec);
+    if (ec) {
+        std::filesystem::remove(tmp, ec);
+        throw pillio::StorageError("Atomic rename failed for " + path.string());
+    }
+}
+
 // Кэш Storage-объектов по uid. Пустой uid → файл из --db (localhost-режим),
 // uid=N → profiles/N.json (Telegram multi-tenant).
 class ProfileManager {
@@ -477,8 +502,7 @@ int main(int argc, char* argv[]) {
                     moods[uid] = nlohmann::json::object();
                 }
                 moods[uid][date] = mood;
-                std::ofstream ofs(mood_path);
-                ofs << moods.dump(2);
+                saveJsonFileAtomic(mood_path, moods);
 
                 jsonResponse(res, {{"ok", true}, {"date", date}, {"mood", mood}});
             } catch (const nlohmann::json::exception& e) {
@@ -575,8 +599,7 @@ int main(int argc, char* argv[]) {
                 }
                 bot_data["_meta"] = {{"updated_at", pillio::formatTimePoint(
                     pillio::Clock::now())}};
-                std::ofstream ofs(bot_path);
-                ofs << bot_data.dump(2);
+                saveJsonFileAtomic(bot_path, bot_data);
                 jsonResponse(res, {{"ok", true}});
             } catch (const nlohmann::json::exception& e) {
                 errorResponse(res, std::string("Invalid JSON: ") + e.what(), 400);
@@ -1088,6 +1111,48 @@ int main(int argc, char* argv[]) {
                 nlohmann::json out = {{"ok", true}};
                 if (r) { out["from"] = r->from; out["from_name"] = r->from_name; }
                 jsonResponse(res, out);
+            } catch (const nlohmann::json::exception& e) {
+                errorResponse(res, std::string("Invalid JSON: ") + e.what(), 400);
+            } catch (const std::exception& e) {
+                errorResponse(res, e.what(), 500);
+            }
+        });
+
+        // ── POST /api/family/relabel  body:{uid, target, relation} ───
+        // Задать/изменить, как Я называю человека из своей семьи. Работает
+        // и для тех, кого я добавил сам, и для тех, чей запрос я принял
+        // (там обратная связь изначально создаётся без метки).
+        svr.Post("/api/family/relabel", [&fam](const httplib::Request& req,
+                                                httplib::Response& res) {
+            try {
+                auto body = nlohmann::json::parse(req.body);
+                auto uid = body.at("uid").get<std::int64_t>();
+                auto target = body.at("target").get<std::int64_t>();
+                auto relation = body.value("relation", std::string{});
+
+                // Связь должна существовать в любом направлении.
+                bool linked = false;
+                for (const auto& l : fam.following(uid)) {
+                    if (l.target == target) { linked = true; break; }
+                }
+                if (!linked) {
+                    for (const auto& l : fam.followers(uid)) {
+                        if (l.follower == target) { linked = true; break; }
+                    }
+                }
+                if (!linked) {
+                    errorResponse(res, "Этого человека нет в вашей семье", 404);
+                    return;
+                }
+
+                // link() обновит метку связи uid → target (создаст при нужде),
+                // не трогая обратную связь.
+                fam.link(uid, target, relation);
+                jsonResponse(res, {{"ok", true},
+                                   {"target", target},
+                                   {"relation", relation}});
+            } catch (const pillio::ValidationError& e) {
+                errorResponse(res, e.what(), 422);
             } catch (const nlohmann::json::exception& e) {
                 errorResponse(res, std::string("Invalid JSON: ") + e.what(), 400);
             } catch (const std::exception& e) {

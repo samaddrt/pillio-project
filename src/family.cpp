@@ -81,13 +81,24 @@ nlohmann::json FamilyStore::load() const {
 }
 
 void FamilyStore::save(const nlohmann::json& data) const {
-    std::ofstream ofs(path_);
-    if (!ofs.is_open()) {
-        throw StorageError("Cannot write family file: " + path_.string());
+    // Атомарная запись: временный файл + rename (см. storage.cpp).
+    std::filesystem::path tmp = path_;
+    tmp += ".tmp";
+    {
+        std::ofstream ofs(tmp, std::ios::trunc);
+        if (!ofs.is_open()) {
+            throw StorageError("Cannot write family file: " + path_.string());
+        }
+        ofs << data.dump(2);
+        if (ofs.fail()) {
+            throw StorageError("Write failed for: " + path_.string());
+        }
     }
-    ofs << data.dump(2);
-    if (ofs.fail()) {
-        throw StorageError("Write failed for: " + path_.string());
+    std::error_code ec;
+    std::filesystem::rename(tmp, path_, ec);
+    if (ec) {
+        std::filesystem::remove(tmp, ec);
+        throw StorageError("Atomic rename failed for: " + path_.string());
     }
 }
 

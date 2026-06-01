@@ -517,6 +517,12 @@ body {
   margin-top:18px;transition:.18s;
 }
 .btn-fam-remove:active{transform:scale(.98);opacity:.8}
+.btn-fam-rename{
+  width:100%;padding:12px;border:1px solid var(--border);border-radius:var(--r);
+  font:600 13px var(--ui);cursor:pointer;background:var(--card2);color:var(--text);
+  margin-top:12px;transition:.18s;
+}
+.btn-fam-rename:active{transform:scale(.98);opacity:.8}
 
 /* ── Settings ───────────────────────────────────────────────────── */
 .set-group{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin:12px 0}
@@ -847,6 +853,7 @@ body {
     </div>
     <div class="fd-sec">Лекарства сегодня</div>
     <div id="fdItems"></div>
+    <button class="btn-fam-rename" id="fdRenameBtn">✎ Изменить имя</button>
     <button class="btn-fam-remove" id="fdRemoveBtn">Удалить из семьи</button>
   </div>
 </div>
@@ -1238,6 +1245,7 @@ function renderFamDetail(f) {
   $('fdStreak').innerHTML = '🔥 ' + (st.streak || 0);
   $('fdTaken').textContent = (st.taken || 0) + '/' + (st.total || 0);
   $('fdRemoveBtn').onclick = () => famUnlink(f.chat_id);
+  $('fdRenameBtn').onclick = () => famRelabel(f.chat_id, f.relation || f.profile_name || '');
 
   const items = st.items || [];
   const box = $('fdItems');
@@ -1353,6 +1361,29 @@ $('famAddBtn').onclick = async () => {
     }
   } catch { showToast('⚠ Сервер недоступен'); }
 };
+
+async function famRelabel(target, current) {
+  haptic();
+  const name = (prompt('Как назвать этого человека? (например: мама, брат, бабушка)', current || '') || '').trim();
+  if (!name) return;
+  try {
+    const r = await apiFetch(`${API}/api/family/relabel`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: Number(UID), target: Number(target), relation: name })
+    });
+    if (r.ok) {
+      try { tg?.HapticFeedback?.notificationOccurred('success') } catch {}
+      showToast('Имя обновлено');
+      // Обновляем модалку и список
+      const fresh = followingCache.find(m => m.chat_id === target);
+      if (fresh) { fresh.relation = name; fresh.name = name; renderFamDetail(fresh); }
+      loadFamily();
+    } else {
+      const e = await r.json().catch(() => ({}));
+      showToast('⚠ ' + (e.error || 'Ошибка'));
+    }
+  } catch { showToast('⚠ Сервер недоступен'); }
+}
 
 async function famUnlink(target) {
   haptic();

@@ -2,6 +2,8 @@
 cmake-build-*/
 build/
 pylibs/
+__pycache__/
+*.pyc
 
 # Data (runtime state — never commit)
 data/store.json
