@@ -34,7 +34,7 @@ DATA_DIR = os.path.dirname(os.path.abspath(STORAGE_PATH)) or "."
 SNAPSHOT_KEY = "pillio/snapshot.tar"
 
 # Files (relative to DATA_DIR) and directories we persist.
-TRACKED_FILES = ["store.json", "family.json", "moods.json", "bot.json"]
+TRACKED_FILES = ["store.json", "family.json", "bot.json"]
 TRACKED_DIRS = ["profiles"]
 
 _client = None

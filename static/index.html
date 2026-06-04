@@ -378,11 +378,6 @@ body {
 .bar-inner{position:absolute;bottom:0;width:100%;border-radius:5px;background:linear-gradient(to top,var(--amber),var(--amber2));transition:height .6s cubic-bezier(.4,0,.2,1)}
 .bar-day{font-size:9px;color:var(--text2);font-weight:500}
 
-/* ── Mood ───────────────────────────────────────────────────────── */
-.mood-row{display:flex;justify-content:center;gap:8px;margin:12px 0 6px}
-.mood-btn{width:50px;height:50px;border-radius:15px;border:1px solid var(--border);background:var(--card);font-size:22px;cursor:pointer;transition:.22s;display:flex;align-items:center;justify-content:center}
-.mood-btn.sel{border-color:var(--amber);background:var(--glow2);transform:scale(1.1);box-shadow:0 4px 20px var(--glow)}
-
 /* ── Icon picker ───────────────────────────────────────────────── */
 .icon-picker{display:flex;gap:6px;flex-wrap:wrap}
 .icon-btn{
@@ -447,12 +442,6 @@ body {
 .fam-req-btn:active{transform:scale(.95)}
 .fam-req-yes{background:linear-gradient(135deg,var(--sage),var(--sage));color:#fff}
 .fam-req-no{background:var(--bg3);color:var(--text2);border:1px solid var(--border2)}
-
-.mood-insight{
-  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
-  padding:14px 16px;margin-top:10px;font-size:12.5px;color:var(--text2);line-height:1.5;
-}
-.mood-insight b{color:var(--text)}
 
 .fam-person{
   background:var(--card);border:1px solid var(--border);border-radius:var(--r);
@@ -582,7 +571,7 @@ body {
       </div>
       <div class="ob-kicker">Прогресс</div>
       <div class="ob-title">Видно<br>результат</div>
-      <div class="ob-desc">Серии дней, статистика приёмов и трекер самочувствия — всё перед глазами</div>
+      <div class="ob-desc">Серии дней и статистика приёмов — всё перед глазами</div>
     </div>
 
   </div>
@@ -671,15 +660,6 @@ body {
         <div class="week-title">Активность за неделю</div>
         <div class="bars" id="weekBars"></div>
       </div>
-      <div class="section-title">Самочувствие сегодня</div>
-      <div class="mood-row" id="moodRow">
-        <button class="mood-btn" data-m="1">😣</button>
-        <button class="mood-btn" data-m="2">😕</button>
-        <button class="mood-btn" data-m="3">😐</button>
-        <button class="mood-btn" data-m="4">🙂</button>
-        <button class="mood-btn" data-m="5">😄</button>
-      </div>
-      <div class="mood-insight" id="moodInsight" style="display:none"></div>
     </div>
 
     <!-- FAMILY -->
@@ -1150,7 +1130,6 @@ async function loadStats() {
     $('stTotal').textContent = scheds.length;
     $('stTaken').textContent = scheds.filter(s => s.taken).length;
     renderWeek();
-    loadMood();
   } catch (e) { console.error(e); }
 }
 
@@ -1170,41 +1149,6 @@ async function renderWeek() {
     html += `<div class="bar-wrap"><div class="bar" style="height:76px"><div class="bar-inner" style="height:${h}%"></div></div><div class="bar-day">${days[dayIdx]}</div></div>`;
   }
   bars.innerHTML = html;
-}
-
-// ── Mood ─────────────────────────────────────────────────────────────
-document.querySelectorAll('.mood-btn').forEach(b => b.onclick = async () => {
-  haptic();
-  document.querySelectorAll('.mood-btn').forEach(x => x.classList.remove('sel'));
-  b.classList.add('sel');
-  const mood = parseInt(b.dataset.m);
-  try {
-    await apiFetch(`${API}/api/mood`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date: todayISO(), mood }) });
-    showToast('Самочувствие сохранено');
-    loadMood();
-  } catch { showToast('⚠ Не удалось сохранить'); }
-});
-
-// Загружает отметку настроения за сегодня и инсайт корреляции с приёмом
-async function loadMood() {
-  try {
-    const r = await apiFetch(`${API}/api/mood/insight?date=${todayISO()}`);
-    if (!r.ok) return;
-    const d = await r.json();
-    document.querySelectorAll('.mood-btn').forEach(x =>
-      x.classList.toggle('sel', parseInt(x.dataset.m) === d.today));
-    const ins = $('moodInsight');
-    if (d.sample >= 3 && d.mood_full != null && d.mood_missed != null) {
-      const diff = (d.mood_full - d.mood_missed);
-      const arrow = diff > 0.3 ? '📈' : (diff < -0.3 ? '📉' : '➡️');
-      ins.style.display = 'block';
-      ins.innerHTML = `${arrow} Когда вы принимаете <b>все</b> лекарства, настроение в среднем <b>${d.mood_full.toFixed(1)}</b> из 5. ` +
-                      `В дни пропусков — <b>${d.mood_missed.toFixed(1)}</b>.`;
-    } else {
-      ins.style.display = 'block';
-      ins.innerHTML = `Отмечайте настроение каждый день — через несколько дней Pillio покажет, как приём лекарств влияет на ваше самочувствие.`;
-    }
-  } catch {}
 }
 
 // ── Family ──────────────────────────────────────────────────────────

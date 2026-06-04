@@ -11,8 +11,7 @@ Pillio Telegram Bot — бот-компаньон для Mini App трекера
 Фоновый цикл (каждые 60 секунд):
   • напоминания о приёме — один раз на слот, с учётом связи с едой;
   • семейные дайджесты о пропусках близких;
-  • доставка запросов на добавление в семью (по @username);
-  • вечерний чек-ин самочувствия.
+  • доставка запросов на добавление в семью (по @username).
 
 Все запросы к C++ API изолированы по пользователю заголовком X-Pillio-Uid.
 """
@@ -48,18 +47,14 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-domain.com")
 API_URL = os.getenv("API_URL", "http://localhost:8080")
 
-# Час вечернего чек-ина самочувствия (локальное время сервера)
-MOOD_CHECKIN_HOUR = int(os.getenv("MOOD_CHECKIN_HOUR", "20"))
-
 logging.basicConfig(
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     level=logging.INFO,
 )
 logger = logging.getLogger("pillio_bot")
 
-# Дедупликация: какие напоминания/чек-ины уже отправлены сегодня.
+# Дедупликация: какие напоминания уже отправлены сегодня.
 _sent_reminders: set[str] = set()
-_mood_checkin_sent: set[str] = set()
 _state_day: str = ""
 
 
@@ -70,7 +65,6 @@ def _reset_daily_state() -> None:
     if today != _state_day:
         _state_day = today
         _sent_reminders.clear()
-        _mood_checkin_sent.clear()
 
 
 # ── HTTP-обёртки ──────────────────────────────────────────────────
@@ -129,16 +123,6 @@ MEAL_HINTS = {
     "during": "примите во время еды",
     "after": "примите сразу после еды",
 }
-
-
-def mood_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton("😣", callback_data="mood:1"),
-        InlineKeyboardButton("😕", callback_data="mood:2"),
-        InlineKeyboardButton("😐", callback_data="mood:3"),
-        InlineKeyboardButton("🙂", callback_data="mood:4"),
-        InlineKeyboardButton("😄", callback_data="mood:5"),
-    ]])
 
 
 def open_app_keyboard(label: str = "💊 Открыть Pillio") -> InlineKeyboardMarkup:
@@ -314,20 +298,6 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await _send_today(uid, send)
         return
 
-    if data.startswith("mood:"):
-        mood = data.split(":", 1)[1]
-        api_post("/api/mood", {"date": today_iso(), "mood": int(mood)}, uid=uid)
-        await query.answer("Записал! Спасибо 🙏")
-        try:
-            await query.edit_message_text(
-                "Спасибо! Самочувствие за сегодня записано 🙏\n"
-                "_Динамику видно в приложении → Статистика._",
-                parse_mode="Markdown",
-            )
-        except Exception:
-            pass
-        return
-
     if data.startswith("famreq:"):
         _, action, req_id = data.split(":", 2)
         if action == "accept":
@@ -482,35 +452,8 @@ async def deliver_family_requests(bot) -> None:
             api_post("/api/family/request/notified", {"request_id": req_id})
 
 
-async def mood_checkin(bot, uid: str, chat_id) -> None:
-    """Раз в день (после MOOD_CHECKIN_HOUR) спрашивает самочувствие."""
-    if datetime.now().hour < MOOD_CHECKIN_HOUR:
-        return
-    key = f"{uid}:{today_iso()}"
-    if key in _mood_checkin_sent:
-        return
-    # Спрашиваем только если человек сегодня пользовался лекарствами.
-    sched = api_get(f"/api/schedule?date={today_iso()}", uid=uid)
-    if not sched or not sched.get("schedules"):
-        _mood_checkin_sent.add(key)
-        return
-    mood = api_get(f"/api/mood?date={today_iso()}", uid=uid)
-    if mood and mood.get("mood", 0) > 0:
-        _mood_checkin_sent.add(key)  # уже отметил в приложении
-        return
-    _mood_checkin_sent.add(key)
-    try:
-        await bot.send_message(
-            chat_id=chat_id,
-            text="🌙 Как ваше самочувствие сегодня?\nЭто поможет увидеть, как лекарства влияют на состояние.",
-            reply_markup=mood_keyboard(),
-        )
-    except Exception as e:
-        logger.warning("mood checkin failed for %s: %s", uid, e)
-
-
 async def background_loop(app: Application):
-    """Главный фоновый цикл: напоминания, дайджесты, запросы, чек-ины."""
+    """Главный фоновый цикл: напоминания, дайджесты, запросы."""
     while True:
         await asyncio.sleep(60)
         try:
@@ -521,7 +464,6 @@ async def background_loop(app: Application):
                     continue
                 await check_reminders(app.bot, uid, chat_id)
                 await check_family_digests(app.bot, uid)
-                await mood_checkin(app.bot, uid, chat_id)
             await deliver_family_requests(app.bot)
         except Exception as e:
             logger.error("background loop error: %s", e)
