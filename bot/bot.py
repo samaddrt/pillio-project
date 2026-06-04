@@ -385,39 +385,51 @@ async def check_reminders(bot, uid: str, chat_id) -> None:
             logger.warning("send reminder failed for %s: %s", uid, e)
 
 
-async def check_family_digests(bot, uid: str) -> None:
-    """Уведомляет близких о пропущенных приёмах пользователя uid."""
-    digest = api_get("/api/family/digest", uid=uid)
-    if not digest:
-        return
-    overdue = digest.get("overdue", [])
-    notify = digest.get("notify", [])
-    if not overdue or not notify:
-        return
+# Через сколько минут после времени приёма считать его пропущенным
+# и тревожить близких (у самого человека есть час, чтобы принять).
+FAMILY_DIGEST_GRACE_MIN = 60
 
-    user_name = digest.get("profile", {}).get("name", "Близкий")
-    lines = [f"⚠️ *{user_name}* пропускает лекарства:\n"]
-    for item in overdue:
-        nm = item.get("pill_name", "?") if isinstance(item, dict) else str(item)
-        tm = item.get("scheduled_time", "")[11:16] if isinstance(item, dict) else ""
-        lines.append(f"  💊 {nm}{(' — ' + tm) if tm else ''}")
-    lines.append("\n_Свяжитесь, чтобы напомнить о приёме._")
-    text = "\n".join(lines)
 
-    for follower in notify:
-        fid = follower.get("chat_id") if isinstance(follower, dict) else follower
-        if not fid:
+async def check_family_digests(bot, uid: str, chat_id) -> None:
+    """Шлёт uid сводку о тех, за кем uid следит, если те пропускают приём.
+
+    Важно: уведомление привязано к НАБЛЮДАТЕЛЮ (uid должен быть в боте, чтобы
+    получить сообщение), а не к тому, за кем следят. Отслеживаемому достаточно
+    пользоваться приложением — запускать бота ему не нужно."""
+    data = api_get("/api/family/following", uid=uid)
+    if not data:
+        return
+    now = datetime.now()
+    for person in data.get("following", []):
+        st = person.get("status") or {}
+        name = person.get("name") or "Близкий"
+        pid = person.get("chat_id")
+        overdue = []
+        for it in (st.get("pending") or []):
+            iso = it.get("scheduled_time", "")
+            try:
+                slot = datetime.strptime(iso[:16], "%Y-%m-%dT%H:%M")
+            except (ValueError, TypeError):
+                continue
+            if (now - slot).total_seconds() / 60.0 >= FAMILY_DIGEST_GRACE_MIN:
+                overdue.append((it.get("pill_name", "?"), iso[11:16]))
+        if not overdue:
             continue
         # Один дайджест на близкого в день на каждый набор пропусков.
-        key = f"digest:{uid}:{fid}:{today_iso()}:{len(overdue)}"
+        key = f"digest:{uid}:{pid}:{today_iso()}:{len(overdue)}"
         if key in _sent_reminders:
             continue
         _sent_reminders.add(key)
+        lines = [f"⚠️ *{name}* пропускает лекарства:\n"]
+        for nm, tm in overdue:
+            lines.append(f"  💊 {nm}{(' — ' + tm) if tm else ''}")
+        lines.append("\n_Свяжитесь, чтобы напомнить о приёме._")
         try:
-            await bot.send_message(chat_id=fid, text=text, parse_mode="Markdown",
+            await bot.send_message(chat_id=chat_id, text="\n".join(lines),
+                                   parse_mode="Markdown",
                                    reply_markup=open_app_keyboard("👀 Подробнее"))
         except Exception as e:
-            logger.warning("notify follower failed: %s", e)
+            logger.warning("notify watcher %s failed: %s", uid, e)
 
 
 async def deliver_family_requests(bot) -> None:
@@ -463,7 +475,7 @@ async def background_loop(app: Application):
                 if not chat_id:
                     continue
                 await check_reminders(app.bot, uid, chat_id)
-                await check_family_digests(app.bot, uid)
+                await check_family_digests(app.bot, uid, chat_id)
             await deliver_family_requests(app.bot)
         except Exception as e:
             logger.error("background loop error: %s", e)
