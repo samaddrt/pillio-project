@@ -48,8 +48,7 @@ TimePoint parseTimePoint(const std::string& iso);
  * @return время следующего запланированного приёма
  * @throws ValidationError если pill не проходит валидацию.
  */
-TimePoint calculateNextIntake(const Pill& pill,
-                              const std::vector<Schedule>& history,
+TimePoint calculateNextIntake(const Pill& pill, const std::vector<Schedule>& history,
                               const TimePoint& now);
 
 /**
@@ -68,12 +67,5 @@ std::vector<Schedule> generateDailySlots(const Pill& pill, const TimePoint& day)
  * @return значение от 0.0 (ничего не принято) до 1.0 (всё принято)
  */
 double dailyProgress(const std::vector<Schedule>& schedules);
-
-/**
- * @brief Возвращает начало текущего дня (00:00:00 local).
- * @param tp произвольная точка времени
- * @return TimePoint, соответствующий полуночи того же дня
- */
-TimePoint startOfDay(const TimePoint& tp);
 
 }  // namespace pillio

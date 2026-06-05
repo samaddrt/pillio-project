@@ -37,7 +37,9 @@ TimePoint parseTimePoint(const std::string& iso) {
     return Clock::from_time_t(time_c);
 }
 
-TimePoint startOfDay(const TimePoint& tp) {
+// Возвращает начало суток (00:00:00) для заданной точки времени.
+// Используется только внутри этого файла (генерация слотов).
+static TimePoint startOfDay(const TimePoint& tp) {
     auto time_c = Clock::to_time_t(tp);
     std::tm tm_buf{};
 #ifdef _WIN32
@@ -57,8 +59,8 @@ std::vector<Schedule> generateDailySlots(const Pill& pill, const TimePoint& day)
     auto midnight = startOfDay(day);
     std::vector<Schedule> slots;
 
-    auto first = midnight + std::chrono::hours(pill.start_hour) +
-                 std::chrono::minutes(pill.start_minute);
+    auto first =
+        midnight + std::chrono::hours(pill.start_hour) + std::chrono::minutes(pill.start_minute);
 
     auto end_of_day = midnight + std::chrono::hours(24);
 
@@ -76,18 +78,14 @@ std::vector<Schedule> generateDailySlots(const Pill& pill, const TimePoint& day)
 }
 
 // Находит ближайший непринятый слот (сегодня или завтра).
-TimePoint calculateNextIntake(const Pill& pill,
-                              const std::vector<Schedule>& history,
+TimePoint calculateNextIntake(const Pill& pill, const std::vector<Schedule>& history,
                               const TimePoint& now) {
     pill.validate();
 
     auto isSlotTaken = [&history](std::uint64_t pid, const std::string& slot_iso) -> bool {
-        return std::any_of(history.begin(), history.end(),
-                           [&](const Schedule& s) {
-                               return s.pill_id == pid &&
-                                      s.scheduled_time == slot_iso &&
-                                      s.taken;
-                           });
+        return std::any_of(history.begin(), history.end(), [&](const Schedule& s) {
+            return s.pill_id == pid && s.scheduled_time == slot_iso && s.taken;
+        });
     };
 
     for (int day_offset = 0; day_offset <= 1; ++day_offset) {
@@ -123,9 +121,8 @@ double dailyProgress(const std::vector<Schedule>& schedules) {
     if (schedules.empty()) {
         return 0.0;
     }
-    auto taken_count =
-        std::count_if(schedules.begin(), schedules.end(),
-                      [](const Schedule& s) { return s.taken; });
+    auto taken_count = std::count_if(schedules.begin(), schedules.end(),
+                                     [](const Schedule& s) { return s.taken; });
     return static_cast<double>(taken_count) / static_cast<double>(schedules.size());
 }
 

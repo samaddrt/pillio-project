@@ -13,8 +13,6 @@
 #include <string>
 #include <vector>
 
-#include "analytics.hpp"
-#include "checker.hpp"
 #include "family.hpp"
 #include "models.hpp"
 #include "storage.hpp"
@@ -23,12 +21,11 @@
 using namespace pillio;
 
 // ════════════════════════════════════════════════════════════════════
-// Helpers
+// Вспомогательные функции
 // ════════════════════════════════════════════════════════════════════
 
 /// Создаёт валидный Pill для тестов.
-static Pill makePill(std::uint64_t id = 1, int interval = 8,
-                     int start_h = 8, int start_m = 0) {
+static Pill makePill(std::uint64_t id = 1, int interval = 8, int start_h = 8, int start_m = 0) {
     Pill p;
     p.id = id;
     p.name = "TestVitamin";
@@ -41,7 +38,7 @@ static Pill makePill(std::uint64_t id = 1, int interval = 8,
 }
 
 // ════════════════════════════════════════════════════════════════════
-// Model validation
+// Валидация моделей
 // ════════════════════════════════════════════════════════════════════
 
 TEST_CASE("Pill validation — positive") {
@@ -98,7 +95,7 @@ TEST_CASE("Schedule validation — empty time") {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// JSON round-trip
+// JSON: сериализация и обратное чтение
 // ════════════════════════════════════════════════════════════════════
 
 TEST_CASE("Pill JSON round-trip") {
@@ -127,7 +124,7 @@ TEST_CASE("Schedule JSON round-trip") {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// Tracker — time helpers
+// Tracker — функции работы со временем
 // ════════════════════════════════════════════════════════════════════
 
 TEST_CASE("formatTimePoint / parseTimePoint round-trip") {
@@ -136,8 +133,7 @@ TEST_CASE("formatTimePoint / parseTimePoint round-trip") {
     CHECK(iso.size() >= 19);  // "YYYY-MM-DDTHH:MM:SS"
     auto parsed = parseTimePoint(iso);
     // Допускаем разницу <= 1 с из-за усечения субсекунд
-    auto diff = std::chrono::duration_cast<std::chrono::seconds>(
-                    now - parsed).count();
+    auto diff = std::chrono::duration_cast<std::chrono::seconds>(now - parsed).count();
     CHECK(std::abs(diff) <= 1);
 }
 
@@ -146,7 +142,7 @@ TEST_CASE("parseTimePoint — invalid string") {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// Tracker — generateDailySlots
+// Tracker — генерация слотов приёма
 // ════════════════════════════════════════════════════════════════════
 
 TEST_CASE("generateDailySlots — 8h interval, start 08:00") {
@@ -176,7 +172,7 @@ TEST_CASE("generateDailySlots — 24h interval") {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// Tracker — calculateNextIntake
+// Tracker — расчёт следующего приёма
 // ════════════════════════════════════════════════════════════════════
 
 TEST_CASE("calculateNextIntake — no history, before first slot") {
@@ -210,7 +206,7 @@ TEST_CASE("calculateNextIntake — with taken history skips slot") {
 
     auto next = calculateNextIntake(pill, history, now);
     auto next_str = formatTimePoint(next);
-    // Should skip 08:00 (taken) and go to 16:00
+    // 08:00 уже принято, поэтому следующий слот — 16:00
     CHECK(next_str == "2025-06-15T16:00:00");
 }
 
@@ -225,7 +221,7 @@ TEST_CASE("calculateNextIntake — all slots today passed, goes tomorrow") {
 
 TEST_CASE("calculateNextIntake — invalid pill throws") {
     Pill bad;
-    bad.name = "";  // invalid
+    bad.name = "";  // некорректное имя
     bad.dosage = 0;
     std::vector<Schedule> h;
     auto now = Clock::now();
@@ -233,7 +229,7 @@ TEST_CASE("calculateNextIntake — invalid pill throws") {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// Tracker — dailyProgress
+// Tracker — прогресс за день
 // ════════════════════════════════════════════════════════════════════
 
 TEST_CASE("dailyProgress — empty") {
@@ -243,20 +239,28 @@ TEST_CASE("dailyProgress — empty") {
 
 TEST_CASE("dailyProgress — all taken") {
     Schedule s1, s2;
-    s1.pill_id = 1; s1.scheduled_time = "t1"; s1.taken = true;
-    s2.pill_id = 1; s2.scheduled_time = "t2"; s2.taken = true;
+    s1.pill_id = 1;
+    s1.scheduled_time = "t1";
+    s1.taken = true;
+    s2.pill_id = 1;
+    s2.scheduled_time = "t2";
+    s2.taken = true;
     CHECK(dailyProgress({s1, s2}) == doctest::Approx(1.0));
 }
 
 TEST_CASE("dailyProgress — half taken") {
     Schedule s1, s2;
-    s1.pill_id = 1; s1.scheduled_time = "t1"; s1.taken = true;
-    s2.pill_id = 1; s2.scheduled_time = "t2"; s2.taken = false;
+    s1.pill_id = 1;
+    s1.scheduled_time = "t1";
+    s1.taken = true;
+    s2.pill_id = 1;
+    s2.scheduled_time = "t2";
+    s2.taken = false;
     CHECK(dailyProgress({s1, s2}) == doctest::Approx(0.5));
 }
 
 // ════════════════════════════════════════════════════════════════════
-// Storage — CRUD & exceptions
+// Storage — CRUD и исключения
 // ════════════════════════════════════════════════════════════════════
 
 TEST_CASE("Storage — add and get pill") {
@@ -264,7 +268,7 @@ TEST_CASE("Storage — add and get pill") {
     {
         Storage st(tmp);
         auto pill = makePill();
-        pill.id = 0;  // will be auto-assigned
+        pill.id = 0;  // id будет назначен автоматически
         auto saved = st.addPill(pill);
         CHECK(saved.id >= 1);
         auto all = st.getAllPills();
@@ -301,9 +305,7 @@ TEST_CASE("Storage — markTaken throws when not found") {
     std::filesystem::path tmp = "./test_tmp_db4.json";
     {
         Storage st(tmp);
-        CHECK_THROWS_AS(
-            st.markTaken(999, "2025-01-01T00:00:00", "now"),
-            NotFoundError);
+        CHECK_THROWS_AS(st.markTaken(999, "2025-01-01T00:00:00", "now"), NotFoundError);
     }
     std::filesystem::remove(tmp);
 }
@@ -314,98 +316,13 @@ TEST_CASE("Storage — corrupted file throws StorageError") {
         std::ofstream ofs(tmp);
         ofs << "NOT VALID JSON {{{";
     }
-    CHECK_THROWS_AS({
-        Storage st(tmp);
-        st.getAllPills();
-    }, StorageError);
+    CHECK_THROWS_AS(
+        {
+            Storage st(tmp);
+            st.getAllPills();
+        },
+        StorageError);
     std::filesystem::remove(tmp);
-}
-
-// ══════════════════════════════════════════════════════════════════
-// Analytics — computeAnalytics
-// ══════════════════════════════════════════════════════════════════
-
-TEST_CASE("Analytics — empty schedules") {
-    std::vector<Schedule> empty;
-    auto now = Clock::now();
-    auto r = computeAnalytics(empty, now);
-    CHECK(r.best_streak == 0);
-    CHECK(r.current_streak == 0);
-    CHECK(r.total_taken == 0);
-    CHECK(r.total_missed == 0);
-    CHECK(r.avg_delay_minutes == doctest::Approx(0.0));
-}
-
-TEST_CASE("Analytics — counts taken and missed") {
-    std::vector<Schedule> scheds;
-    Schedule s1; s1.pill_id=1; s1.scheduled_time="2025-06-15T08:00:00"; s1.taken=true; s1.taken_at="2025-06-15T08:05:00";
-    Schedule s2; s2.pill_id=1; s2.scheduled_time="2025-06-15T16:00:00"; s2.taken=false; s2.taken_at="";
-    Schedule s3; s3.pill_id=1; s3.scheduled_time="2025-06-16T08:00:00"; s3.taken=true; s3.taken_at="2025-06-16T08:10:00";
-    scheds = {s1, s2, s3};
-    auto now = parseTimePoint("2025-06-17T12:00:00");
-    auto r = computeAnalytics(scheds, now);
-    CHECK(r.total_taken == 2);
-    CHECK(r.total_missed == 1);
-}
-
-TEST_CASE("Analytics — avg delay") {
-    Schedule s1; s1.pill_id=1; s1.scheduled_time="2025-06-15T08:00:00"; s1.taken=true; s1.taken_at="2025-06-15T08:10:00";
-    Schedule s2; s2.pill_id=1; s2.scheduled_time="2025-06-15T16:00:00"; s2.taken=true; s2.taken_at="2025-06-15T16:20:00";
-    auto now = parseTimePoint("2025-06-16T12:00:00");
-    auto r = computeAnalytics({s1, s2}, now);
-    // (10 + 20) / 2 = 15 minutes
-    CHECK(r.avg_delay_minutes == doctest::Approx(15.0));
-}
-
-TEST_CASE("Analytics — adherenceForPeriod template") {
-    Schedule s1; s1.pill_id=1; s1.scheduled_time="t1"; s1.taken=true;
-    Schedule s2; s2.pill_id=2; s2.scheduled_time="t2"; s2.taken=false;
-    Schedule s3; s3.pill_id=1; s3.scheduled_time="t3"; s3.taken=true;
-    auto adh = adherenceForPeriod<std::function<bool(const Schedule&)>>(
-        {s1, s2, s3},
-        [](const Schedule& s) { return s.pill_id == 1; }
-    );
-    CHECK(adh == doctest::Approx(1.0)); // 2/2 for pill_id=1
-}
-
-// ══════════════════════════════════════════════════════════════════
-// Checker — checkInteractions
-// ══════════════════════════════════════════════════════════════════
-
-TEST_CASE("Checker — no interactions for safe drugs") {
-    auto result = checkInteractions({"Vitamin C", "Zinc"});
-    CHECK(result.empty());
-}
-
-TEST_CASE("Checker — detects warfarin + aspirin") {
-    auto result = checkInteractions({"Warfarin", "Aspirin"});
-    CHECK(result.size() == 1);
-    CHECK(result[0].severity == Severity::Dangerous);
-}
-
-TEST_CASE("Checker — case insensitive matching") {
-    auto result = checkInteractions({"WARFARIN", "aspirin"});
-    CHECK(result.size() == 1);
-}
-
-TEST_CASE("Checker — detects multiple interactions") {
-    auto result = checkInteractions({"Warfarin", "Aspirin", "Ibuprofen"});
-    // warfarin+aspirin, warfarin+ibuprofen, aspirin+ibuprofen = 3
-    CHECK(result.size() == 3);
-}
-
-TEST_CASE("Checker — single drug is safe") {
-    auto result = checkInteractions({"Aspirin"});
-    CHECK(result.empty());
-}
-
-TEST_CASE("Checker — empty list is safe") {
-    auto result = checkInteractions({});
-    CHECK(result.empty());
-}
-
-TEST_CASE("Checker — database has entries") {
-    CHECK(interactionDatabaseSize() >= 15);
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -431,7 +348,7 @@ TEST_CASE("Family — ensureProfile is idempotent (stable code)") {
         auto p1 = fs.ensureProfile(111, "Мама");
         auto p2 = fs.ensureProfile(111, "Мама обновлённая");
         CHECK(p1.share_code == p2.share_code);  // код не меняется
-        CHECK(p2.name == "Мама обновлённая");    // имя обновилось
+        CHECK(p2.name == "Мама обновлённая");   // имя обновилось
     }
     std::filesystem::remove(tmp);
 }

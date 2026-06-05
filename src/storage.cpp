@@ -25,7 +25,7 @@ Storage::Storage(const std::filesystem::path& db_path) : db_path_(db_path) {
     }
 }
 
-// ─── Private helpers ────────────────────────────────────────────
+// ─── Приватные вспомогательные методы ───────────────────────────
 
 nlohmann::json Storage::load() const {
     std::ifstream ifs(db_path_);
@@ -75,7 +75,7 @@ std::uint64_t Storage::nextPillId(const nlohmann::json& data) const {
     return max_id + 1;
 }
 
-// ─── Pill CRUD ──────────────────────────────────────────────────
+// ─── CRUD лекарств ──────────────────────────────────────────────
 
 std::vector<Pill> Storage::getAllPills() const {
     auto data = load();
@@ -88,8 +88,7 @@ std::vector<Pill> Storage::getAllPills() const {
 
 Pill Storage::getPillById(std::uint64_t id) const {
     auto pills = getAllPills();
-    auto it = std::find_if(pills.begin(), pills.end(),
-                           [id](const Pill& p) { return p.id == id; });
+    auto it = std::find_if(pills.begin(), pills.end(), [id](const Pill& p) { return p.id == id; });
     if (it == pills.end()) {
         throw NotFoundError("Pill not found: id=" + std::to_string(id));
     }
@@ -108,10 +107,9 @@ Pill Storage::addPill(Pill pill) {
 void Storage::removePill(std::uint64_t id) {
     auto data = load();
     auto& pills = data["pills"];
-    auto it = std::remove_if(pills.begin(), pills.end(),
-                             [id](const nlohmann::json& j) {
-                                 return j.value("id", static_cast<std::uint64_t>(0)) == id;
-                             });
+    auto it = std::remove_if(pills.begin(), pills.end(), [id](const nlohmann::json& j) {
+        return j.value("id", static_cast<std::uint64_t>(0)) == id;
+    });
     if (it == pills.end()) {
         throw NotFoundError("Pill not found for removal: id=" + std::to_string(id));
     }
@@ -119,17 +117,16 @@ void Storage::removePill(std::uint64_t id) {
 
     // Удаляем связанные записи расписания
     auto& scheds = data["schedules"];
-    scheds.erase(
-        std::remove_if(scheds.begin(), scheds.end(),
-                       [id](const nlohmann::json& j) {
-                           return j.value("pill_id", static_cast<std::uint64_t>(0)) == id;
-                       }),
-        scheds.end());
+    scheds.erase(std::remove_if(scheds.begin(), scheds.end(),
+                                [id](const nlohmann::json& j) {
+                                    return j.value("pill_id", static_cast<std::uint64_t>(0)) == id;
+                                }),
+                 scheds.end());
 
     save(data);
 }
 
-// ─── Schedule CRUD ──────────────────────────────────────────────
+// ─── CRUD расписания ────────────────────────────────────────────
 
 std::vector<Schedule> Storage::getAllSchedules() const {
     auto data = load();
@@ -143,10 +140,9 @@ std::vector<Schedule> Storage::getAllSchedules() const {
 std::vector<Schedule> Storage::getSchedulesForDate(const std::string& date_prefix) const {
     auto all = getAllSchedules();
     std::vector<Schedule> filtered;
-    std::copy_if(all.begin(), all.end(), std::back_inserter(filtered),
-                 [&date_prefix](const Schedule& s) {
-                     return s.scheduled_time.rfind(date_prefix, 0) == 0;
-                 });
+    std::copy_if(
+        all.begin(), all.end(), std::back_inserter(filtered),
+        [&date_prefix](const Schedule& s) { return s.scheduled_time.rfind(date_prefix, 0) == 0; });
     return filtered;
 }
 
@@ -157,8 +153,7 @@ void Storage::addSchedule(Schedule entry) {
     save(data);
 }
 
-void Storage::markTaken(std::uint64_t pill_id,
-                        const std::string& scheduled_time,
+void Storage::markTaken(std::uint64_t pill_id, const std::string& scheduled_time,
                         const std::string& taken_at) {
     auto data = load();
     bool found = false;
@@ -172,8 +167,8 @@ void Storage::markTaken(std::uint64_t pill_id,
         }
     }
     if (!found) {
-        throw NotFoundError("Schedule slot not found: pill_id=" +
-                            std::to_string(pill_id) + " time=" + scheduled_time);
+        throw NotFoundError("Schedule slot not found: pill_id=" + std::to_string(pill_id) +
+                            " time=" + scheduled_time);
     }
     save(data);
 }

@@ -15,14 +15,12 @@ namespace pillio {
 namespace {
 
 std::string toUpper(std::string s) {
-    std::transform(s.begin(), s.end(), s.begin(),
-                   [](unsigned char c) { return std::toupper(c); });
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::toupper(c); });
     return s;
 }
 
 std::string toLower(std::string s) {
-    std::transform(s.begin(), s.end(), s.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
     return s;
 }
 
@@ -192,8 +190,7 @@ std::optional<Profile> FamilyStore::profileByUsername(const std::string& usernam
 
 // Связи
 
-void FamilyStore::link(std::int64_t follower, std::int64_t target,
-                       const std::string& relation) {
+void FamilyStore::link(std::int64_t follower, std::int64_t target, const std::string& relation) {
     FamilyLink l;
     l.follower = follower;
     l.target = target;
@@ -246,8 +243,8 @@ void FamilyStore::unlink(std::int64_t follower, std::int64_t target) {
     auto data = load();
     auto& links = data["links"];
     // Удаляем обе связи: A→B и B→A
-    auto it = std::remove_if(
-        links.begin(), links.end(), [follower, target](const nlohmann::json& e) {
+    auto it =
+        std::remove_if(links.begin(), links.end(), [follower, target](const nlohmann::json& e) {
             auto f = e.value("follower", static_cast<std::int64_t>(0));
             auto t = e.value("target", static_cast<std::int64_t>(0));
             return (f == follower && t == target) || (f == target && t == follower);
@@ -369,10 +366,9 @@ void FamilyStore::markNotified(const std::string& id) {
 void FamilyStore::removeRequest(const std::string& id) {
     auto data = load();
     auto& reqs = data["requests"];
-    reqs.erase(std::remove_if(reqs.begin(), reqs.end(),
-                              [&id](const nlohmann::json& e) {
-                                  return e.value("id", std::string{}) == id;
-                              }),
+    reqs.erase(std::remove_if(
+                   reqs.begin(), reqs.end(),
+                   [&id](const nlohmann::json& e) { return e.value("id", std::string{}) == id; }),
                reqs.end());
     save(data);
 }

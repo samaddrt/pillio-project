@@ -843,6 +843,17 @@ body {
 <script>
 const API = window.location.origin;
 const tg  = window.Telegram?.WebApp;
+const QS  = new URLSearchParams(location.search);
+const DEMO_PAGE = QS.get('page') || 'home';
+
+if (QS.get('demo') === '1') {
+  try {
+    localStorage.setItem('pillio_uid', '111');
+    localStorage.setItem('pillio_uname', 'Alexey');
+    localStorage.setItem('pillio_unick', 'demo_user');
+    localStorage.setItem('pillio_ob', '1');
+  } catch {}
+}
 
 // Идентификатор пользователя. Берём из Telegram, иначе — из localStorage
 // (резерв на случай, когда initDataUnsafe не заполнен), чтобы данные
@@ -904,7 +915,7 @@ $('themeToggle').onclick = () => {
 
 // ── Onboarding ──────────────────────────────────────────────────────
 let obIdx = 0;
-const obDone = localStorage.getItem('pillio_ob');
+const obDone = localStorage.getItem('pillio_ob') || (QS.get('demo') === '1' ? '1' : '');
 if (obDone) { $('onboarding').style.display = 'none'; $('app').style.display = 'flex'; }
 
 $('obBtn').onclick = () => {
@@ -1433,7 +1444,16 @@ function showToast(msg) {
 
 // ── Init ─────────────────────────────────────────────────────────────
 function initApp() { initHeader(); loadSchedule(); }
+function activateDemoPage() {
+  const pageId = DEMO_PAGE === 'stats' ? 'pageStats'
+    : DEMO_PAGE === 'family' ? 'pageFamily'
+    : DEMO_PAGE === 'settings' ? 'pageSettings'
+    : 'pageHome';
+  const tab = document.querySelector(`.tab[data-p="${pageId}"]`);
+  if (tab) tab.click();
+}
 if (obDone) initApp();
+if (obDone) setTimeout(activateDemoPage, 350);
 </script>
 </body>
 </html>

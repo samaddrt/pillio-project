@@ -2,7 +2,7 @@ run = "bash start.sh"
 entrypoint = "src/main.cpp"
 
 [deployment]
-build = ["sh", "-c", "mkdir -p build && g++ -std=c++20 -O2 -I src -I third_party src/main.cpp src/tracker.cpp src/storage.cpp src/analytics.cpp src/checker.cpp src/family.cpp -o build/pillio -lpthread 2>&1 && pip install --target ./pylibs -r bot/requirements.txt"]
+build = ["sh", "-c", "mkdir -p build && g++ -std=c++20 -O2 -I src -I third_party src/main.cpp src/tracker.cpp src/storage.cpp src/family.cpp -o build/pillio -lpthread 2>&1 && pip install --target ./pylibs -r bot/requirements.txt"]
 run = ["sh", "-c", "PYTHONPATH=./pylibs python3 bot/persist.py restore; ./build/pillio & PYTHONPATH=./pylibs python3 bot/bot.py & wait"]
 deploymentTarget = "cloudrun"
 
@@ -12,8 +12,8 @@ externalPort = 80
 
 [env]
 API_PORT = "8080"
-STORAGE_PATH = "/tmp/store.json"
-FAMILY_STORAGE_PATH = "/tmp/family.json"
-BOT_TOKEN = "8696800857:AAGFoxyRUdPTyDallFvvbAV6QS56i31mlOw"
+STORAGE_PATH = "./data/store.json"
+FAMILY_STORAGE_PATH = "./data/family.json"
+BOT_TOKEN = ""
 WEBAPP_URL = "https://pillio-dodoevsamad1.replit.app"
 API_URL = "http://localhost:8080"

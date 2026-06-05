@@ -2,24 +2,38 @@
   "version": 3,
   "configurePresets": [
     {
-      "name": "clion-mingw",
-      "displayName": "MinGW with Local Vcpkg",
+      "name": "debug",
+      "displayName": "Debug",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/cmake-build-debug",
+      "binaryDir": "${sourceDir}/build/debug",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_C_COMPILER": "C:/Program Files/JetBrains/CLion 2026.1.1/bin/mingw/bin/gcc.exe",
-        "CMAKE_CXX_COMPILER": "C:/Program Files/JetBrains/CLion 2026.1.1/bin/mingw/bin/g++.exe",
-        "CMAKE_MAKE_PROGRAM": "C:/Program Files/JetBrains/CLion 2026.1.1/bin/ninja/win/x64/ninja.exe",
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/../projectaip/vcpkg/scripts/buildsystems/vcpkg.cmake",
-        "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic"
-      },
-      "environment": {
-        "VCPKG_DEFAULT_TRIPLET": "x64-mingw-dynamic",
-        "VCPKG_VISUAL_STUDIO_PATH": "",
-        "CC": "C:/Program Files/JetBrains/CLion 2026.1.1/bin/mingw/bin/gcc.exe",
-        "CXX": "C:/Program Files/JetBrains/CLion 2026.1.1/bin/mingw/bin/g++.exe"
+        "CMAKE_BUILD_TYPE": "Debug"
       }
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
     }
   ]
 }
