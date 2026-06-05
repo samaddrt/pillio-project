@@ -18,7 +18,4 @@ bot/.env
 # IDE
 .idea/
 .vscode/
-.claude/
-.codex/
-.cursor/
 *.swp
