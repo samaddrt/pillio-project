@@ -190,6 +190,10 @@ doxygen Doxyfile
 
 ![Экран семейного доступа Mini App](docs/readme-family-mobile.png)
 
+### Уведомления Telegram-бота
+
+![Уведомления Telegram-бота](docs/readme-bot-notifications.jpg)
+
 ## Telegram-бот
 
 Бот лежит в `bot/` и использует:
