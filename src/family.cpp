@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <chrono>
 #include <fstream>
 #include <random>
 
@@ -310,7 +309,6 @@ FamilyRequest FamilyStore::addRequest(std::int64_t from, const std::string& from
     FamilyRequest r;
     r.id = makeRequestId();
     r.from = from;
-    r.from_name = from_name.empty() ? std::string{"Пользователь"} : from_name;
     r.to = to;
     r.relation = relation;
     r.created_at = formatTimePoint(Clock::now());

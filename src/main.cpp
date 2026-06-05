@@ -13,25 +13,16 @@
 #include <string>
 #include <vector>
 
-// ── Совместимость с MinGW для httplib ────────────────────────────
-// Заголовки MinGW часто не объявляют API Windows 8 (например,
-// GetAddrInfoExCancel), которые httplib считает доступными при
-// _WIN32_WINNT >= 0x0602 — добавляем заглушку.
+// Совместимость MinGW с httplib на Windows.
 #ifdef _WIN32
-// clang-format off
 #include <winsock2.h>
 #include <windows.h>
-// clang-format on
 inline int GetAddrInfoExCancel(HANDLE* x) {
     return 0;
 }
 #endif
-// ─────────────────────────────────────────────────────────────────
-
 #include <httplib.h>
-
 #include <nlohmann/json.hpp>
-
 #include "family.hpp"
 #include "models.hpp"
 #include "storage.hpp"
@@ -373,7 +364,6 @@ int main(int argc, char* argv[]) {
 
         httplib::Server svr;
 
-        // ── Заголовки CORS (для всех ответов) ───────────────────
         auto applyCors = [](httplib::Response& res) {
             res.set_header("Access-Control-Allow-Origin", "*");
             res.set_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
@@ -389,7 +379,6 @@ int main(int argc, char* argv[]) {
             res.status = 204;
         });
 
-        // ── No-cache для статики ────────────────────────────────
         // Запрещаем браузеру кэшировать ответы, чтобы при обновлении
         // index.html всегда отдавалась свежая версия (а не старая из кэша).
         svr.set_post_routing_handler([](const httplib::Request& /*req*/, httplib::Response& res) {
@@ -398,7 +387,6 @@ int main(int argc, char* argv[]) {
             res.set_header("Expires", "0");
         });
 
-        // ── GET /api/pills ──────────────────────────────────────
         svr.Get("/api/pills",
                 guarded([&profiles](const httplib::Request& req, httplib::Response& res) {
                     auto* storage = &profiles.get(getUid(req));
@@ -407,7 +395,6 @@ int main(int argc, char* argv[]) {
                     jsonResponse(res, j);
                 }));
 
-        // ── POST /api/pills ─────────────────────────────────────
         svr.Post("/api/pills",
                  guarded([&profiles](const httplib::Request& req, httplib::Response& res) {
                      auto* storage = &profiles.get(getUid(req));
@@ -422,7 +409,6 @@ int main(int argc, char* argv[]) {
                      jsonResponse(res, j, 201);
                  }));
 
-        // ── DELETE /api/pills/:id ───────────────────────────────
         svr.Delete(R"(/api/pills/(\d+))",
                    guarded([&profiles](const httplib::Request& req, httplib::Response& res) {
                        auto* storage = &profiles.get(getUid(req));
@@ -431,7 +417,6 @@ int main(int argc, char* argv[]) {
                        jsonResponse(res, {{"ok", true}});
                    }));
 
-        // ── GET /api/schedule?date=YYYY-MM-DD ───────────────────
         svr.Get("/api/schedule",
                 guarded([&profiles](const httplib::Request& req, httplib::Response& res) {
                     auto* storage = &profiles.get(getUid(req));
@@ -469,7 +454,6 @@ int main(int argc, char* argv[]) {
                     jsonResponse(res, body);
                 }));
 
-        // ── POST /api/take ──────────────────────────────────────
         svr.Post("/api/take",
                  guarded([&profiles](const httplib::Request& req, httplib::Response& res) {
                      auto* storage = &profiles.get(getUid(req));
@@ -482,7 +466,6 @@ int main(int argc, char* argv[]) {
                      jsonResponse(res, {{"ok", true}, {"taken_at", taken_at}});
                  }));
 
-        // ── GET /api/next?pill_id=N ─────────────────────────────
         svr.Get(
             "/api/next", guarded([&profiles](const httplib::Request& req, httplib::Response& res) {
                 auto* storage = &profiles.get(getUid(req));
@@ -499,7 +482,6 @@ int main(int argc, char* argv[]) {
                     res, {{"pill_id", pill_id}, {"next_intake", pillio::formatTimePoint(next)}});
             }));
 
-        // ── GET /api/stats ──────────────────────────────────────────
         svr.Get("/api/stats",
                 guarded([&profiles](const httplib::Request& req, httplib::Response& res) {
                     auto* storage = &profiles.get(getUid(req));
@@ -522,7 +504,6 @@ int main(int argc, char* argv[]) {
                               {"progress", total > 0 ? static_cast<double>(taken) / total : 0.0}});
                 }));
 
-        // ── POST /api/bot/register ──────────────────────────────────
         // Сохраняет соответствие telegram_id -> chat_id в bot.json
         svr.Post(
             "/api/bot/register",
@@ -539,7 +520,6 @@ int main(int argc, char* argv[]) {
                 jsonResponse(res, {{"ok", true}});
             }));
 
-        // ── GET /api/bot/reminders ──────────────────────────────────
         svr.Get("/api/bot/reminders",
                 guarded([&profiles](const httplib::Request& req, httplib::Response& res) {
                     auto* storage = &profiles.get(getUid(req));
@@ -564,7 +544,6 @@ int main(int argc, char* argv[]) {
                     jsonResponse(res, {{"reminders", pending}});
                 }));
 
-        // ── GET /api/bot/users ─────────────────────────────────────────
         // Возвращает всех зарегистрированных пользователей: {users: {uid: chat_id, ...}}
         svr.Get("/api/bot/users",
                 guarded([&db_path](const httplib::Request& /*req*/, httplib::Response& res) {
@@ -576,7 +555,6 @@ int main(int argc, char* argv[]) {
                     jsonResponse(res, {{"users", users}});
                 }));
 
-        // ── GET /api/export/csv ──────────────────────────────────────
         svr.Get("/api/export/csv",
                 guarded([&profiles](const httplib::Request& req, httplib::Response& res) {
                     auto* storage = &profiles.get(getUid(req));
@@ -604,11 +582,8 @@ int main(int argc, char* argv[]) {
                     res.set_header("Content-Disposition", "attachment; filename=pillio_export.csv");
                 }));
 
-        // ════════════════════════════════════════════════════════════
         // Семейный доступ (family sharing)
-        // ════════════════════════════════════════════════════════════
 
-        // ── GET /api/family/me?uid=&name= ────────────────────────────
         // Возвращает (создавая при необходимости) мой профиль с share-кодом
         // и текущим дневным статусом — «то, что увидят близкие».
         svr.Get("/api/family/me",
@@ -628,7 +603,6 @@ int main(int argc, char* argv[]) {
                                        {"status", buildDailyStatus(st)}});
                 }));
 
-        // ── POST /api/family/follow ──────────────────────────────────
         // Подписаться на чужой профиль по share-коду.
         // body: {uid, name, code, relation}
         svr.Post("/api/family/follow",
@@ -659,7 +633,6 @@ int main(int argc, char* argv[]) {
                                   201);
                  }));
 
-        // ── DELETE /api/family/follow?uid=&target= ───────────────────
         svr.Delete("/api/family/follow",
                    guarded([&fam](const httplib::Request& req, httplib::Response& res) {
                        auto uid_str = getUid(req);
@@ -672,7 +645,6 @@ int main(int argc, char* argv[]) {
                        jsonResponse(res, {{"ok", true}});
                    }));
 
-        // ── GET /api/family/following?uid= ───────────────────────────
         // Список профилей, за которыми я слежу, с их дневным статусом.
         // name = как я их назвал (relation), profile_name = их настоящее имя
         svr.Get("/api/family/following",
@@ -694,7 +666,6 @@ int main(int argc, char* argv[]) {
                     jsonResponse(res, {{"following", arr}});
                 }));
 
-        // ── GET /api/family/members?uid= ────────────────────────────
         // Все связанные пользователи (following ∪ followers, дедупликация)
         // с полным дневным статусом. Единый список «Моя семья».
         // name = как я их назвал (relation), profile_name = их настоящее имя
@@ -724,7 +695,6 @@ int main(int argc, char* argv[]) {
                     jsonResponse(res, {{"members", arr}});
                 }));
 
-        // ── GET /api/family/followers?uid= ───────────────────────────
         // Список тех, кто видит мой статус.
         svr.Get("/api/family/followers",
                 guarded([&fam](const httplib::Request& req, httplib::Response& res) {
@@ -740,7 +710,6 @@ int main(int argc, char* argv[]) {
                     jsonResponse(res, {{"followers", arr}});
                 }));
 
-        // ── GET /api/family/digest?uid= ──────────────────────────────
         // Для Telegram-бота: просроченные приёмы пользователя uid и список
         // близких (chat_id), которым нужно отправить уведомление.
         svr.Get("/api/family/digest",
@@ -770,7 +739,6 @@ int main(int argc, char* argv[]) {
                               {"notify", notify}});
                 }));
 
-        // ── POST /api/family/request ─────────────────────────────────
         // Запрос на добавление в семью по @username.
         // body: {uid, name, username, target_username, relation}
         svr.Post("/api/family/request",
@@ -808,7 +776,6 @@ int main(int argc, char* argv[]) {
                          201);
                  }));
 
-        // ── GET /api/family/requests?uid= ────────────────────────────
         // Входящие запросы для пользователя uid.
         svr.Get("/api/family/requests",
                 guarded([&fam](const httplib::Request& req, httplib::Response& res) {
@@ -824,7 +791,6 @@ int main(int argc, char* argv[]) {
                     jsonResponse(res, {{"requests", arr}});
                 }));
 
-        // ── GET /api/family/requests/outbox ──────────────────────────
         // Для бота: запросы, о которых ещё не уведомлён получатель.
         svr.Get("/api/family/requests/outbox",
                 guarded([&fam](const httplib::Request& /*req*/, httplib::Response& res) {
@@ -839,7 +805,6 @@ int main(int argc, char* argv[]) {
                     jsonResponse(res, {{"requests", arr}});
                 }));
 
-        // ── POST /api/family/request/notified  body:{request_id} ─────
         svr.Post("/api/family/request/notified",
                  guarded([&fam](const httplib::Request& req, httplib::Response& res) {
                      auto body = nlohmann::json::parse(req.body);
@@ -847,7 +812,6 @@ int main(int argc, char* argv[]) {
                      jsonResponse(res, {{"ok", true}});
                  }));
 
-        // ── POST /api/family/request/accept  body:{request_id, name} ─
         // Подтверждение получателем: создаётся связь from → to.
         svr.Post("/api/family/request/accept",
                  guarded([&fam](const httplib::Request& req, httplib::Response& res) {
@@ -869,7 +833,6 @@ int main(int argc, char* argv[]) {
                                         {"relation", r->relation}});
                  }));
 
-        // ── POST /api/family/request/decline  body:{request_id} ──────
         svr.Post("/api/family/request/decline",
                  guarded([&fam](const httplib::Request& req, httplib::Response& res) {
                      auto body = nlohmann::json::parse(req.body);
@@ -884,7 +847,6 @@ int main(int argc, char* argv[]) {
                      jsonResponse(res, out);
                  }));
 
-        // ── POST /api/family/relabel  body:{uid, target, relation} ───
         // Задать/изменить, как Я называю человека из своей семьи. Работает
         // и для тех, кого я добавил сам, и для тех, чей запрос я принял
         // (там обратная связь изначально создаётся без метки).

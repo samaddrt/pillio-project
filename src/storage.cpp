@@ -1,10 +1,8 @@
 // storage.cpp — JSON-файл как база данных.
 
 #include "storage.hpp"
-
 #include <algorithm>
 #include <fstream>
-#include <sstream>
 
 namespace pillio {
 
@@ -25,7 +23,6 @@ Storage::Storage(const std::filesystem::path& db_path) : db_path_(db_path) {
     }
 }
 
-// ─── Приватные вспомогательные методы ───────────────────────────
 
 nlohmann::json Storage::load() const {
     std::ifstream ifs(db_path_);
@@ -75,7 +72,6 @@ std::uint64_t Storage::nextPillId(const nlohmann::json& data) const {
     return max_id + 1;
 }
 
-// ─── CRUD лекарств ──────────────────────────────────────────────
 
 std::vector<Pill> Storage::getAllPills() const {
     auto data = load();
@@ -126,7 +122,6 @@ void Storage::removePill(std::uint64_t id) {
     save(data);
 }
 
-// ─── CRUD расписания ────────────────────────────────────────────
 
 std::vector<Schedule> Storage::getAllSchedules() const {
     auto data = load();

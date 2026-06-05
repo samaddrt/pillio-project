@@ -20,9 +20,9 @@
 
 using namespace pillio;
 
-// ════════════════════════════════════════════════════════════════════
+
 // Вспомогательные функции
-// ════════════════════════════════════════════════════════════════════
+
 
 /// Создаёт валидный Pill для тестов.
 static Pill makePill(std::uint64_t id = 1, int interval = 8, int start_h = 8, int start_m = 0) {
@@ -37,9 +37,7 @@ static Pill makePill(std::uint64_t id = 1, int interval = 8, int start_h = 8, in
     return p;
 }
 
-// ════════════════════════════════════════════════════════════════════
 // Валидация моделей
-// ════════════════════════════════════════════════════════════════════
 
 TEST_CASE("Pill validation — positive") {
     auto p = makePill();
@@ -94,9 +92,7 @@ TEST_CASE("Schedule validation — empty time") {
     CHECK_THROWS_AS(s.validate(), ValidationError);
 }
 
-// ════════════════════════════════════════════════════════════════════
 // JSON: сериализация и обратное чтение
-// ════════════════════════════════════════════════════════════════════
 
 TEST_CASE("Pill JSON round-trip") {
     auto p = makePill(42, 12, 9, 30);
@@ -123,9 +119,8 @@ TEST_CASE("Schedule JSON round-trip") {
     CHECK(s2.taken_at == "2025-06-15T14:05:00");
 }
 
-// ════════════════════════════════════════════════════════════════════
 // Tracker — функции работы со временем
-// ════════════════════════════════════════════════════════════════════
+
 
 TEST_CASE("formatTimePoint / parseTimePoint round-trip") {
     auto now = Clock::now();
@@ -141,9 +136,8 @@ TEST_CASE("parseTimePoint — invalid string") {
     CHECK_THROWS_AS(parseTimePoint("not-a-date"), ValidationError);
 }
 
-// ════════════════════════════════════════════════════════════════════
+
 // Tracker — генерация слотов приёма
-// ════════════════════════════════════════════════════════════════════
 
 TEST_CASE("generateDailySlots — 8h interval, start 08:00") {
     auto pill = makePill(1, 8, 8, 0);
@@ -171,9 +165,7 @@ TEST_CASE("generateDailySlots — 24h interval") {
     CHECK(slots[0].scheduled_time == "2025-06-15T10:30:00");
 }
 
-// ════════════════════════════════════════════════════════════════════
 // Tracker — расчёт следующего приёма
-// ════════════════════════════════════════════════════════════════════
 
 TEST_CASE("calculateNextIntake — no history, before first slot") {
     auto pill = makePill(1, 8, 8, 0);
@@ -228,9 +220,7 @@ TEST_CASE("calculateNextIntake — invalid pill throws") {
     CHECK_THROWS_AS(calculateNextIntake(bad, h, now), ValidationError);
 }
 
-// ════════════════════════════════════════════════════════════════════
 // Tracker — прогресс за день
-// ════════════════════════════════════════════════════════════════════
 
 TEST_CASE("dailyProgress — empty") {
     std::vector<Schedule> empty;
@@ -259,9 +249,7 @@ TEST_CASE("dailyProgress — half taken") {
     CHECK(dailyProgress({s1, s2}) == doctest::Approx(0.5));
 }
 
-// ════════════════════════════════════════════════════════════════════
 // Storage — CRUD и исключения
-// ════════════════════════════════════════════════════════════════════
 
 TEST_CASE("Storage — add and get pill") {
     std::filesystem::path tmp = "./test_tmp_db.json";
@@ -325,9 +313,7 @@ TEST_CASE("Storage — corrupted file throws StorageError") {
     std::filesystem::remove(tmp);
 }
 
-// ══════════════════════════════════════════════════════════════════
 // FamilyStore — семейный доступ
-// ══════════════════════════════════════════════════════════════════
 
 TEST_CASE("Family — ensureProfile creates profile with share code") {
     std::filesystem::path tmp = "./test_tmp_family1.json";

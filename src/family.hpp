@@ -19,7 +19,6 @@
 
 namespace pillio {
 
-// ── Profile ──────────────────────────────────────────────────────
 
 struct Profile {
     std::int64_t chat_id{0};  ///< Telegram chat_id владельца профиля
@@ -40,7 +39,6 @@ struct Profile {
 /// @brief JSON-сериализация Profile.
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Profile, chat_id, name, share_code, username)
 
-// ── FamilyRequest — запрос на добавление в семью по \@username ─────
 
 struct FamilyRequest {
     std::string id;          ///< Уникальный идентификатор запроса
@@ -56,7 +54,6 @@ struct FamilyRequest {
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(FamilyRequest, id, from, from_name, to, relation,
                                                 created_at, notified)
 
-// ── FamilyLink — подписка «кто → за кем» ─────────────────────────
 
 struct FamilyLink {
     std::int64_t follower{0};  ///< chat_id того, кто следит
@@ -77,7 +74,6 @@ struct FamilyLink {
 /// @brief JSON-сериализация FamilyLink.
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(FamilyLink, follower, target, relation, created_at)
 
-// ── FamilyStore — JSON-хранилище профилей и связей ───────────────
 
 /**
  * @brief JSON-хранилище профилей, связей подписок и запросов в семью.

@@ -4,12 +4,9 @@
  * @brief Доменные модели: Pill, Schedule + JSON-сериализация.
  */
 
-#include <chrono>
-#include <cstdint>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
 namespace pillio {
 
@@ -31,7 +28,6 @@ class NotFoundError : public std::runtime_error {
     explicit NotFoundError(const std::string& msg) : std::runtime_error(msg) {}
 };
 
-// ── Pill — описание одного лекарства ──────────────────────────────
 
 struct Pill {
     std::uint64_t id{0};                ///< Уникальный идентификатор
@@ -78,7 +74,6 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Pill, id, name, dosage, unit, in
                                                 start_hour, start_minute, meal_relation,
                                                 course_days)
 
-// ── Schedule — отметка о конкретном приёме ────────────────────────
 
 struct Schedule {
     std::uint64_t pill_id{0};    ///< ID связанного Pill
