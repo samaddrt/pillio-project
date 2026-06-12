@@ -374,8 +374,9 @@ int main(int argc, char* argv[]) {
                 applyCors(res);
                 return httplib::Server::HandlerResponse::Unhandled;
             });
-        svr.Options(".*", [&applyCors](const httplib::Request&, httplib::Response& res) {
-            applyCors(res);
+        // CORS-заголовки здесь не ставим: pre_routing уже добавил их,
+        // а дубликаты Access-Control-* браузер отвергает целиком.
+        svr.Options(".*", [](const httplib::Request&, httplib::Response& res) {
             res.status = 204;
         });
 
@@ -581,6 +582,23 @@ int main(int argc, char* argv[]) {
                     res.set_content(csv.str(), "text/csv");
                     res.set_header("Content-Disposition", "attachment; filename=pillio_export.csv");
                 }));
+
+        // ── POST /api/ai/ask ─────────────────────────────────────────
+        // Прокси к локальному AI-сервису (Python-процесс бота, порт 8090).
+        // Сам C++ в интернет не ходит: HTTPS-запрос к языковой модели
+        // выполняет Python, а ключ API хранится в переменных окружения.
+        svr.Post("/api/ai/ask",
+                 guarded([](const httplib::Request& req, httplib::Response& res) {
+                     httplib::Client ai("127.0.0.1", 8090);
+                     ai.set_read_timeout(30, 0);
+                     auto r = ai.Post("/ask", req.body, "application/json");
+                     if (!r) {
+                         errorResponse(res, "AI-сервис недоступен", 503);
+                         return;
+                     }
+                     res.status = r->status;
+                     res.set_content(r->body, "application/json");
+                 }));
 
         // Семейный доступ (family sharing)
 

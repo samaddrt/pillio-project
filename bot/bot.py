@@ -24,6 +24,7 @@ from datetime import datetime
 import requests
 from dotenv import load_dotenv
 
+import ai_server  # AI-помощник мобильного приложения (порт 8090)
 import persist  # durable snapshot of the data dir into Replit Object Storage
 from telegram import (
     Update,
@@ -493,6 +494,9 @@ def main():
     if not BOT_TOKEN or BOT_TOKEN == "ВСТАВЬТЕ_ТОКЕН_БОТА":
         print("❌ Укажите BOT_TOKEN в bot/.env или переменных окружения")
         return
+
+    # AI-помощник мобильного приложения: C++ проксирует /api/ai/ask сюда
+    ai_server.start_ai_server()
 
     app = Application.builder().token(BOT_TOKEN).build()
 

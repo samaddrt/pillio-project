@@ -19,3 +19,8 @@ bot/.env
 .idea/
 .vscode/
 *.swp
+
+# Android-приложение (генерируемые артефакты)
+app/node_modules/
+app/android/
+app/package-lock.json

@@ -1,0 +1,1727 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Pillio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>try{if(localStorage.getItem('pillio_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
+<style>
+/* ── Amber Apothecary palette ───────────────────────────────────── */
+:root {
+  --bg:      #0C0A07;
+  --bg2:     #13100B;
+  --bg3:     #1A150E;
+  --bg4:     #271F14;
+
+  --card:    rgba(255,247,232,.035);
+  --card2:   rgba(255,247,232,.06);
+  --border:  rgba(240,222,190,.08);
+  --border2: rgba(240,222,190,.14);
+
+  --text:    #F4EEE2;
+  --text2:   #8C8270;
+  --text3:   #4D4534;
+
+  --amber:   #E8A33D;
+  --amber2:  #F6C977;
+  --glow:    rgba(232,163,61,.24);
+  --glow2:   rgba(232,163,61,.10);
+
+  --sage:    #93B97A; --sage-bg: rgba(147,185,122,.12);
+  --clay:    #D9805C; --clay-bg: rgba(217,128,92,.12);
+  --rose:    #D898A8; --rose-bg: rgba(216,152,168,.12);
+  --honey:   #E8A33D; --honey-bg:rgba(232,163,61,.12);
+
+  --r:16px; --rsm:11px; --rxs:8px;
+  --ui:'Inter',system-ui,-apple-system,sans-serif;
+  --display:'Fraunces',Georgia,serif;
+  --blur:blur(24px);
+
+  --bg-glow1:rgba(232,163,61,.13);
+  --bg-glow2:rgba(217,128,92,.06);
+  --dose-grad:linear-gradient(150deg,#1E1810 0%,#15110B 100%);
+  --bar-bg:rgba(12,10,7,.9);
+  --btn-ink:#1A150E;
+}
+
+/* ── Light theme: «Pergament» (та же аптечная палитра, светлый фон) ── */
+[data-theme="light"]{
+  --bg:      #FAF4E8;
+  --bg2:     #FFFFFF;
+  --bg3:     #FFFFFF;
+  --bg4:     #ECE1CE;
+
+  --card:    rgba(58,42,18,.035);
+  --card2:   rgba(58,42,18,.06);
+  --border:  rgba(58,42,18,.10);
+  --border2: rgba(58,42,18,.17);
+
+  --text:    #2B2114;
+  --text2:   #7C6F58;
+  --text3:   #AC9C7F;
+
+  --amber:   #B57309;
+  --amber2:  #D8941F;
+  --glow:    rgba(181,115,9,.18);
+  --glow2:   rgba(181,115,9,.08);
+
+  --sage:    #5E8A41; --sage-bg: rgba(94,138,65,.13);
+  --clay:    #C25C36; --clay-bg: rgba(194,92,54,.13);
+  --rose:    #BD6178; --rose-bg: rgba(189,97,120,.13);
+  --honey:   #B57309; --honey-bg:rgba(181,115,9,.13);
+
+  --bg-glow1:rgba(181,115,9,.10);
+  --bg-glow2:rgba(194,92,54,.05);
+  --dose-grad:linear-gradient(150deg,#FFFFFF 0%,#FBF3E3 100%);
+  --bar-bg:rgba(250,244,232,.92);
+  --btn-ink:#2B2114;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+::selection{background:var(--amber);color:var(--bg)}
+html{transition:background .4s}
+
+body {
+  font-family:var(--ui);
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  min-height:var(--tg-viewport-stable-height,100vh);
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:contain;
+  -webkit-tap-highlight-color:transparent;
+  background-image:
+    radial-gradient(ellipse 75% 42% at 50% -8%, var(--bg-glow1) 0%, transparent 100%),
+    radial-gradient(ellipse 55% 38% at 88% 108%, var(--bg-glow2) 0%, transparent 100%);
+  background-attachment:fixed;
+  transition:background-color .4s,color .4s;
+}
+
+/* ── Onboarding ─────────────────────────────────────────────────── */
+.onboarding{
+  position:fixed;inset:0;z-index:1000;
+  background:var(--bg);
+  background-image:radial-gradient(ellipse 85% 50% at 50% -12%, rgba(232,163,61,.16) 0%, transparent 100%);
+  display:flex;flex-direction:column;transition:opacity .55s;
+}
+.onboarding.hide{opacity:0;pointer-events:none}
+
+.ob-slides{flex:1;display:flex;overflow:hidden;scroll-snap-type:x mandatory}
+.ob-slide{
+  min-width:100%;scroll-snap-align:start;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:52px 40px;text-align:center;
+}
+
+/* Animated capsule on slide 1 */
+.ob-capsule{
+  width:96px;height:200px;border-radius:48px;
+  position:relative;margin-bottom:40px;
+  background:linear-gradient(180deg, rgba(255,247,232,.06), rgba(255,247,232,.02));
+  border:1px solid var(--border2);
+  overflow:hidden;
+  box-shadow:0 0 70px var(--glow), inset 0 2px 12px rgba(255,247,232,.05);
+}
+.ob-capsule::before{
+  content:'';position:absolute;left:0;right:0;bottom:0;height:55%;
+  background:linear-gradient(180deg, var(--amber2), var(--amber));
+  box-shadow:0 -2px 24px var(--glow);
+  animation:fillUp 3.4s cubic-bezier(.5,0,.3,1) infinite alternate;
+}
+.ob-capsule::after{
+  content:'';position:absolute;left:50%;top:0;transform:translateX(-50%);
+  width:60%;height:6px;background:rgba(255,247,232,.12);border-radius:0 0 6px 6px;
+}
+@keyframes fillUp{from{height:25%}to{height:70%}}
+
+.ob-icon{
+  width:104px;height:104px;border-radius:30px;
+  background:var(--card2);border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:40px;box-shadow:0 0 60px var(--glow);
+  animation:float 4.2s ease-in-out infinite;
+}
+.ob-icon svg{width:46px;height:46px}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+
+.ob-kicker{font-size:11px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--amber);margin-bottom:14px}
+.ob-title{font-family:var(--display);font-size:34px;font-weight:600;letter-spacing:-.5px;margin-bottom:14px;line-height:1.05}
+.ob-desc{font-size:15px;color:var(--text2);line-height:1.65;max-width:280px;font-weight:400}
+
+.ob-dots{display:flex;justify-content:center;gap:6px;padding:24px 0 18px}
+.ob-dot{width:5px;height:5px;border-radius:50%;background:var(--bg4);transition:.3s}
+.ob-dot.active{width:20px;border-radius:3px;background:var(--amber)}
+
+.ob-btn{
+  margin:0 24px calc(52px + env(safe-area-inset-bottom,0px));
+  padding:17px;border:none;border-radius:var(--r);
+  font:600 15px var(--ui);color:var(--btn-ink);
+  background:linear-gradient(135deg,var(--amber2),var(--amber));
+  cursor:pointer;box-shadow:0 8px 32px var(--glow);
+  transition:transform .2s,opacity .2s;
+}
+.ob-btn:active{transform:scale(.97);opacity:.92}
+
+/* ── App shell ──────────────────────────────────────────────────── */
+.app{display:flex;flex-direction:column;min-height:100vh}
+.app-body{flex:1;padding:0 16px calc(78px + env(safe-area-inset-bottom,12px));overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+/* ── Tab bar ────────────────────────────────────────────────────── */
+.tab-bar{
+  position:fixed;bottom:0;left:0;right:0;display:flex;
+  background:var(--bar-bg);
+  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  border-top:1px solid var(--border);
+  padding:9px 0 calc(7px + env(safe-area-inset-bottom,8px));z-index:100;
+}
+.tab{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:4px 0;border:none;background:none;
+  font:500 10px var(--ui);color:var(--text3);cursor:pointer;transition:color .2s;
+  letter-spacing:.3px;text-transform:uppercase;
+}
+.tab.active{color:var(--amber)}
+.tab-icon{display:flex;align-items:center;justify-content:center;transition:transform .25s cubic-bezier(.4,0,.2,1)}
+.tab-icon svg{width:21px;height:21px}
+.tab.active .tab-icon{transform:scale(1.12)}
+
+/* ── Pages ──────────────────────────────────────────────────────── */
+.page{display:none;animation:fadeUp .32s cubic-bezier(.4,0,.2,1)}
+.page.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr{padding:24px 2px 12px;display:flex;justify-content:space-between;align-items:flex-start}
+.hdr-greet{font-size:13px;color:var(--text2);font-weight:400;margin-bottom:5px}
+.hdr-date{font-family:var(--display);font-size:24px;font-weight:600;letter-spacing:-.3px;line-height:1.05}
+
+.hdr-streak{
+  display:flex;align-items:center;gap:5px;padding:7px 13px;border-radius:22px;
+  background:var(--honey-bg);border:1px solid rgba(232,163,61,.16);
+  font:600 12px var(--ui);color:var(--amber);flex-shrink:0;
+}
+.hdr-actions{display:flex;align-items:center;gap:9px;flex-shrink:0}
+.theme-toggle{
+  width:36px;height:36px;border-radius:50%;flex-shrink:0;
+  border:1px solid var(--border2);background:var(--card);color:var(--amber);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  transition:transform .25s,background .2s,color .2s;
+}
+.theme-toggle:active{transform:scale(.88) rotate(-25deg)}
+.theme-toggle svg{width:18px;height:18px}
+.theme-ic-moon{display:none}
+[data-theme="light"] .theme-ic-sun{display:none}
+[data-theme="light"] .theme-ic-moon{display:block}
+
+/* ── Dose hero card ─────────────────────────────────────────────── */
+.dose-card{
+  background:var(--dose-grad);
+  border:1px solid var(--border);border-radius:24px;
+  padding:22px;margin:8px 0 4px;position:relative;overflow:hidden;
+}
+.dose-card::before{
+  content:'';position:absolute;top:-60px;right:-40px;
+  width:180px;height:180px;border-radius:50%;
+  background:radial-gradient(circle,var(--glow) 0%,transparent 70%);pointer-events:none;
+}
+.dose-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;position:relative}
+.dose-pct{font-family:var(--display);font-size:52px;font-weight:600;letter-spacing:-1.5px;line-height:.9;color:var(--text)}
+.dose-sub{font-size:13px;color:var(--text2);margin-top:8px;font-weight:400}
+.dose-emblem{
+  width:48px;height:48px;border-radius:14px;flex-shrink:0;
+  background:var(--honey-bg);border:1px solid rgba(232,163,61,.18);
+  display:flex;align-items:center;justify-content:center;
+}
+.dose-emblem svg{width:24px;height:24px}
+
+/* The signature capsule progress bar */
+.capsule{
+  height:20px;border-radius:12px;position:relative;overflow:hidden;
+  background:var(--bg4);border:1px solid var(--border);
+}
+.capsule-fill{
+  position:absolute;left:0;top:0;bottom:0;width:0;border-radius:12px;
+  background:linear-gradient(90deg,var(--amber) 0%,var(--amber2) 100%);
+  box-shadow:0 0 24px var(--glow);
+  transition:width .9s cubic-bezier(.4,0,.2,1);
+}
+.capsule-fill::after{
+  content:'';position:absolute;top:3px;left:8px;right:8px;height:5px;border-radius:4px;
+  background:linear-gradient(90deg,rgba(255,255,255,.35),transparent);
+}
+
+.next-dose{
+  margin-top:16px;padding:9px 13px;border-radius:var(--rsm);
+  background:var(--card);border:1px solid var(--border);
+  color:var(--amber2);font-size:12px;font-weight:500;
+  display:none;align-items:center;gap:7px;
+}
+.next-dose b{color:var(--text);font-weight:600}
+
+/* ── Section title ──────────────────────────────────────────────── */
+.section-title{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;margin:24px 2px 12px}
+
+/* ── Timeline ───────────────────────────────────────────────────── */
+.tl{position:relative;padding-left:18px}
+.tl::before{content:'';position:absolute;left:4px;top:8px;bottom:8px;width:1px;background:linear-gradient(to bottom,var(--amber),transparent);opacity:.22}
+.slot{margin-bottom:20px;position:relative}
+.slot-dot{position:absolute;left:-16px;top:6px;width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 3px var(--glow2)}
+.slot-time{font-size:11px;font-weight:600;color:var(--text2);margin-bottom:7px;letter-spacing:.4px}
+
+/* ── Pill card ──────────────────────────────────────────────────── */
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:13px 15px;display:flex;align-items:center;gap:12px;margin-bottom:7px;
+  transition:transform .18s,background .18s;
+  animation:cardIn .32s cubic-bezier(.4,0,.2,1) backwards;
+}
+.card:active{transform:scale(.985);background:var(--card2)}
+@keyframes cardIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+
+.card-ic{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;letter-spacing:-.2px;flex-shrink:0;font-family:var(--display)}
+.card-ic.has-emoji{font-size:20px;font-weight:400;font-family:sans-serif;letter-spacing:0}
+.ic-amber{background:var(--honey-bg);color:var(--amber)}
+.ic-sage {background:var(--sage-bg); color:var(--sage)}
+.ic-clay {background:var(--clay-bg); color:var(--clay)}
+.ic-rose {background:var(--rose-bg); color:var(--rose)}
+
+.card-info{flex:1;min-width:0}
+.card-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-dose{font-size:11px;color:var(--text2);font-weight:400;margin-top:3px;display:flex;flex-wrap:wrap;align-items:center;gap:4px}
+
+.btn-take{
+  padding:7px 15px;border:none;border-radius:18px;
+  font:600 11px var(--ui);cursor:pointer;
+  background:linear-gradient(135deg,var(--amber2),var(--amber));color:var(--btn-ink);
+  flex-shrink:0;transition:.18s;box-shadow:0 4px 16px var(--glow);letter-spacing:.1px;
+}
+.btn-take:active{transform:scale(.92)}
+.btn-take.done{background:var(--sage-bg);color:var(--sage);box-shadow:none;pointer-events:none}
+
+.btn-del{width:28px;height:28px;border:none;border-radius:8px;background:transparent;color:var(--text3);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s}
+.btn-del:active{color:var(--clay);transform:scale(.9)}
+
+/* ── FAB ────────────────────────────────────────────────────────── */
+.fab{
+  position:fixed;bottom:92px;right:18px;width:52px;height:52px;border-radius:18px;border:none;
+  cursor:pointer;background:linear-gradient(135deg,var(--amber2),var(--amber));color:var(--btn-ink);
+  font-size:26px;font-weight:300;line-height:1;box-shadow:0 8px 30px var(--glow);
+  display:flex;align-items:center;justify-content:center;z-index:99;transition:.28s cubic-bezier(.4,0,.2,1);
+}
+.fab:active{transform:scale(.88) rotate(90deg)}
+.fab.hidden{opacity:0;pointer-events:none;transform:scale(.5) translateY(20px)}
+
+/* ── Modal ──────────────────────────────────────────────────────── */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.66);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);z-index:200;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .28s}
+.ov.open{opacity:1;pointer-events:auto}
+.modal{
+  background:var(--bg2);border:1px solid var(--border2);border-radius:22px 22px 0 0;
+  width:100%;max-width:480px;padding:20px 18px calc(36px + env(safe-area-inset-bottom,0px));
+  transform:translateY(100%);transition:transform .38s cubic-bezier(.22,.68,0,1.02);
+}
+.ov.open .modal{transform:translateY(0)}
+.modal-handle{width:34px;height:3px;border-radius:2px;background:var(--bg4);margin:0 auto 18px}
+.modal-title{font-family:var(--display);font-size:21px;font-weight:600;margin-bottom:18px;letter-spacing:-.3px}
+
+.field{margin-bottom:12px}
+.field label{display:block;font-size:10px;font-weight:600;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.7px}
+.field input,.field select{
+  width:100%;padding:11px 13px;border:1px solid var(--border2);border-radius:var(--rsm);
+  font:500 14px var(--ui);color:var(--text);background:var(--bg3);outline:none;
+  transition:border .18s,box-shadow .18s;-webkit-appearance:none;
+}
+.field input:focus,.field select:focus{border-color:var(--amber);box-shadow:0 0 0 3px var(--glow2)}
+.row{display:flex;gap:8px}.row .field{flex:1}
+
+.btn-sub{
+  width:100%;padding:14px;border:none;border-radius:var(--r);
+  font:600 14px var(--ui);cursor:pointer;
+  background:linear-gradient(135deg,var(--amber2),var(--amber));color:var(--btn-ink);
+  margin-top:6px;box-shadow:0 8px 28px var(--glow);transition:.18s;
+}
+.btn-sub:active{transform:scale(.98)}
+
+/* ── Segmented control ──────────────────────────────────────────── */
+.seg{display:flex;gap:3px;padding:3px;border-radius:var(--rsm);background:var(--bg3);border:1px solid var(--border)}
+.seg-btn{flex:1;padding:8px 4px;border:none;background:transparent;font:500 11px var(--ui);color:var(--text2);cursor:pointer;transition:.18s;text-align:center;border-radius:8px}
+.seg-btn.sel{background:linear-gradient(135deg,var(--amber2),var(--amber));color:var(--btn-ink);box-shadow:0 3px 12px var(--glow)}
+
+/* ── Meal badge ─────────────────────────────────────────────────── */
+.meal-badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:5px;font-size:10px;font-weight:600}
+.meal-badge.before{background:var(--honey-bg);color:var(--amber)}
+.meal-badge.during{background:var(--sage-bg);color:var(--sage)}
+.meal-badge.after {background:var(--rose-bg);color:var(--rose)}
+
+/* ── Take all ───────────────────────────────────────────────────── */
+.btn-take-all{width:100%;padding:10px;border:1px solid rgba(147,185,122,.2);border-radius:var(--r);font:600 12px var(--ui);cursor:pointer;background:var(--sage-bg);color:var(--sage);margin:4px 0 10px;transition:.18s}
+.btn-take-all:active{transform:scale(.98)}
+
+/* ── Stats ──────────────────────────────────────────────────────── */
+.page-header{padding:28px 2px 6px;font-family:var(--display);font-size:30px;font-weight:600;letter-spacing:-.5px}
+
+.stat-cards{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:18px 15px;position:relative;overflow:hidden}
+.stat-glow{position:absolute;top:-24px;right:-24px;width:80px;height:80px;border-radius:50%;opacity:.32;pointer-events:none}
+.stat-val{font-family:var(--display);font-size:34px;font-weight:600;letter-spacing:-1px;line-height:1}
+.stat-lbl{font-size:11px;color:var(--text2);font-weight:500;margin-top:5px}
+
+.week-chart{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin:12px 0}
+.week-title{font-size:13px;font-weight:600;margin-bottom:14px}
+.bars{display:flex;justify-content:space-between;align-items:flex-end;height:76px;gap:5px}
+.bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px}
+.bar{width:100%;border-radius:5px;background:var(--bg4);min-height:4px;position:relative;overflow:hidden}
+.bar-inner{position:absolute;bottom:0;width:100%;border-radius:5px;background:linear-gradient(to top,var(--amber),var(--amber2));transition:height .6s cubic-bezier(.4,0,.2,1)}
+.bar-day{font-size:9px;color:var(--text2);font-weight:500}
+
+/* ── Icon picker ───────────────────────────────────────────────── */
+.icon-picker{display:flex;gap:6px;flex-wrap:wrap}
+.icon-btn{
+  width:44px;height:44px;border-radius:13px;border:1px solid var(--border);
+  background:var(--card);font-size:21px;cursor:pointer;transition:.22s;
+  display:flex;align-items:center;justify-content:center;padding:0;
+}
+.icon-btn:active{transform:scale(.9)}
+.icon-btn.sel{border-color:var(--amber);background:var(--glow2);transform:scale(1.08);box-shadow:0 3px 16px var(--glow)}
+
+/* ── Family ────────────────────────────────────────────────────── */
+.fam-code-card{
+  background:var(--dose-grad);border:1px solid var(--border);border-radius:var(--r);
+  padding:20px;margin:12px 0;text-align:center;position:relative;overflow:hidden;
+}
+.fam-code-card::before{
+  content:'';position:absolute;top:-50px;right:-30px;width:140px;height:140px;border-radius:50%;
+  background:radial-gradient(circle,var(--glow) 0%,transparent 70%);pointer-events:none;
+}
+.fam-code-lbl{font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px}
+.fam-code-val{font-family:var(--display);font-size:36px;font-weight:700;letter-spacing:6px;color:var(--amber);position:relative}
+.fam-code-copy{
+  display:inline-flex;align-items:center;gap:5px;margin-top:10px;padding:7px 16px;border-radius:18px;
+  border:1px solid var(--border2);background:var(--card);color:var(--text2);
+  font:500 11px var(--ui);cursor:pointer;transition:.18s;
+}
+.fam-code-copy:active{transform:scale(.95);background:var(--card2)}
+.fam-code-name{font-size:12px;color:var(--text2);margin-top:6px}
+
+.fam-add{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:16px;margin:12px 0;
+}
+.fam-add-title{font-size:13px;font-weight:600;margin-bottom:10px}
+.fam-add-row{display:flex;gap:8px}
+.fam-add-row input{
+  flex:1;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--rsm);
+  font:500 13px var(--ui);color:var(--text);background:var(--bg3);outline:none;
+  transition:border .18s;
+}
+.fam-add-row input:focus{border-color:var(--amber)}
+.fam-add-btn{
+  padding:10px 16px;border:none;border-radius:var(--rsm);
+  font:600 12px var(--ui);cursor:pointer;flex-shrink:0;
+  background:linear-gradient(135deg,var(--amber2),var(--amber));color:var(--btn-ink);
+  transition:.18s;
+}
+.fam-add-btn:active{transform:scale(.95)}
+.fam-add-hint{font-size:11px;color:var(--text2);margin-top:10px;line-height:1.4}
+
+.fam-req{
+  background:var(--card);border:1px solid var(--amber);border-radius:var(--r);
+  padding:14px 15px;margin-bottom:8px;
+}
+.fam-req-txt{font-size:13px;margin-bottom:10px;line-height:1.4}
+.fam-req-txt b{color:var(--amber)}
+.fam-req-actions{display:flex;gap:8px}
+.fam-req-btn{
+  flex:1;padding:9px 0;border:none;border-radius:var(--rsm);
+  font:600 12px var(--ui);cursor:pointer;transition:.18s;
+}
+.fam-req-btn:active{transform:scale(.95)}
+.fam-req-yes{background:linear-gradient(135deg,var(--sage),var(--sage));color:#fff}
+.fam-req-no{background:var(--bg3);color:var(--text2);border:1px solid var(--border2)}
+
+.fam-person{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:14px 15px;margin-bottom:8px;display:flex;align-items:center;gap:12px;
+  animation:cardIn .32s cubic-bezier(.4,0,.2,1) backwards;
+}
+.fam-avatar{
+  width:40px;height:40px;border-radius:13px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font:600 14px var(--display);letter-spacing:-.2px;
+}
+.fam-person-info{flex:1;min-width:0}
+.fam-person-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fam-person-rel{font-size:11px;color:var(--text2);margin-top:2px}
+.fam-person-status{flex-shrink:0;text-align:right}
+.fam-person-pct{font-family:var(--display);font-size:20px;font-weight:600;color:var(--amber)}
+.fam-person-sub{font-size:10px;color:var(--text2);margin-top:1px}
+.fam-unlink{
+  width:28px;height:28px;border:none;border-radius:8px;background:transparent;
+  color:var(--text3);font-size:14px;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;transition:.15s;
+}
+.fam-unlink:active{color:var(--clay);transform:scale(.9)}
+.fam-person.clickable{cursor:pointer}
+.fam-person.clickable:active{transform:scale(.985);background:var(--card2)}
+.fam-chevron{color:var(--text3);font-size:16px;flex-shrink:0}
+
+/* ── Family member detail ───────────────────────────────────────── */
+.fd-head{display:flex;align-items:center;gap:13px;margin-bottom:18px}
+.fd-avatar{
+  width:52px;height:52px;border-radius:16px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font:600 19px var(--display);letter-spacing:-.2px;
+}
+.fd-name{font-family:var(--display);font-size:20px;font-weight:600;letter-spacing:-.3px}
+.fd-rel{font-size:12px;color:var(--text2);margin-top:2px}
+.fd-stats{display:flex;gap:8px;margin-bottom:20px}
+.fd-stat{
+  flex:1;background:var(--card);border:1px solid var(--border);border-radius:var(--rsm);
+  padding:13px 8px;text-align:center;
+}
+.fd-val{font-family:var(--display);font-size:23px;font-weight:700;color:var(--amber);line-height:1}
+.fd-lbl{font-size:9.5px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-top:6px}
+.fd-sec{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;margin:4px 0 10px}
+.fd-item{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--rsm);
+  padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;gap:11px;
+}
+.fd-item-ic{
+  width:34px;height:34px;border-radius:11px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font:600 12px var(--display);
+}
+.fd-item-info{flex:1;min-width:0}
+.fd-item-name{font-size:13px;font-weight:600}
+.fd-item-meta{font-size:11px;color:var(--text2);margin-top:1px}
+.fd-item-state{font-size:11px;font-weight:600;flex-shrink:0;padding:4px 9px;border-radius:9px}
+.fd-item-state.taken{background:var(--sage-bg);color:var(--sage)}
+.fd-item-state.pending{background:var(--bg3);color:var(--text3)}
+.btn-fam-remove{
+  width:100%;padding:12px;border:1px solid rgba(217,128,92,.25);border-radius:var(--r);
+  font:600 13px var(--ui);cursor:pointer;background:var(--clay-bg);color:var(--clay);
+  margin-top:18px;transition:.18s;
+}
+.btn-fam-remove:active{transform:scale(.98);opacity:.8}
+.btn-fam-rename{
+  width:100%;padding:12px;border:1px solid var(--border);border-radius:var(--r);
+  font:600 13px var(--ui);cursor:pointer;background:var(--card2);color:var(--text);
+  margin-top:12px;transition:.18s;
+}
+.btn-fam-rename:active{transform:scale(.98);opacity:.8}
+
+/* ── Settings ───────────────────────────────────────────────────── */
+.set-group{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin:12px 0}
+.set-item{padding:14px 15px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);cursor:pointer;transition:.15s}
+.set-item:last-child{border:none}
+.set-item:active{background:var(--card2)}
+.set-ic{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.set-ic svg{width:17px;height:17px}
+.set-info{flex:1}
+.si-title{font-size:14px;font-weight:600}
+.si-desc{font-size:11px;color:var(--text2);margin-top:2px}
+.set-arrow{color:var(--text3);font-size:18px;font-weight:300}
+
+/* ── Empty & Toast ──────────────────────────────────────────────── */
+.empty{text-align:center;padding:44px 20px;color:var(--text2)}
+.empty-ic{margin-bottom:12px;display:flex;justify-content:center;opacity:.5}
+.empty-ic svg{width:40px;height:40px}
+.empty-txt{font-size:13px;font-weight:500}
+
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-80px);background:var(--bg3);border:1px solid var(--border2);padding:11px 20px;border-radius:var(--r);box-shadow:0 16px 50px rgba(0,0,0,.6);font-size:13px;font-weight:600;z-index:999;transition:transform .38s cubic-bezier(.4,0,.2,1);white-space:nowrap}
+.toast.show{transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- ── ONBOARDING ─────────────────────────────────────────────────── -->
+<div class="onboarding" id="onboarding">
+  <div class="ob-slides" id="obSlides">
+
+    <div class="ob-slide">
+      <div class="ob-capsule"></div>
+      <div class="ob-kicker">Личная аптека</div>
+      <div class="ob-title">Pillio</div>
+      <div class="ob-desc">Каждая доза — на счету. Наполняй капсулу дня и держи здоровье под контролем</div>
+    </div>
+
+    <div class="ob-slide">
+      <div class="ob-icon">
+        <svg viewBox="0 0 46 46" fill="none">
+          <path d="M11 19a12 12 0 0124 0c0 7 2 9 3 11H8c1-2 3-4 3-11z" stroke="#E8A33D" stroke-width="1.8" stroke-linejoin="round"/>
+          <path d="M20 35a3 3 0 006 0" stroke="#E8A33D" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ob-kicker">Вовремя</div>
+      <div class="ob-title">Ни одной<br>пропущенной</div>
+      <div class="ob-desc">Уведомление мягко напомнит о приёме именно тогда, когда нужно</div>
+    </div>
+
+    <div class="ob-slide">
+      <div class="ob-icon">
+        <svg viewBox="0 0 46 46" fill="none">
+          <rect x="7" y="28" width="6" height="12" rx="3" fill="#E8A33D" opacity=".4"/>
+          <rect x="17" y="20" width="6" height="20" rx="3" fill="#E8A33D" opacity=".62"/>
+          <rect x="27" y="13" width="6" height="27" rx="3" fill="#E8A33D" opacity=".82"/>
+          <circle cx="36" cy="9" r="3.5" fill="#F6C977"/>
+        </svg>
+      </div>
+      <div class="ob-kicker">Прогресс</div>
+      <div class="ob-title">Видно<br>результат</div>
+      <div class="ob-desc">Серии дней и статистика приёмов — всё перед глазами</div>
+    </div>
+
+  </div>
+  <div class="ob-dots" id="obDots">
+    <span class="ob-dot active"></span>
+    <span class="ob-dot"></span>
+    <span class="ob-dot"></span>
+  </div>
+  <button class="ob-btn" id="obBtn">Далее</button>
+</div>
+
+<!-- ── APP ───────────────────────────────────────────────────────── -->
+<div class="app" id="app" style="display:none">
+  <div class="app-body">
+
+    <!-- HOME -->
+    <div class="page active" id="pageHome">
+      <div class="hdr">
+        <div>
+          <div class="hdr-greet" id="greet">Добрый день</div>
+          <div class="hdr-date"  id="dateDisp"></div>
+        </div>
+        <div class="hdr-actions">
+          <button class="theme-toggle" id="aiBtn" aria-label="AI-помощник" style="font-size:15px">✨</button>
+          <button class="theme-toggle" id="themeToggle" aria-label="Сменить тему">
+            <svg class="theme-ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M4.2 4.2l1.5 1.5M18.3 18.3l1.5 1.5M2.5 12h2M19.5 12h2M4.2 19.8l1.5-1.5M18.3 5.7l1.5-1.5"/></svg>
+            <svg class="theme-ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13.5A8 8 0 1110.5 4a6.2 6.2 0 009.5 9.5z"/></svg>
+          </button>
+          <div class="hdr-streak" id="streak">🔥 0 дн.</div>
+        </div>
+      </div>
+
+      <div class="dose-card">
+        <div class="dose-top">
+          <div>
+            <div class="dose-pct" id="ringPct">0%</div>
+            <div class="dose-sub" id="progDesc">Загрузка...</div>
+          </div>
+          <div class="dose-emblem">
+            <svg viewBox="0 0 24 24" fill="none">
+              <rect x="3.5" y="8" width="17" height="8" rx="4" stroke="#E8A33D" stroke-width="1.6"/>
+              <path d="M12 8v8" stroke="#E8A33D" stroke-width="1.6"/>
+              <rect x="12" y="8" width="8.5" height="8" rx="4" fill="#E8A33D" opacity=".22"/>
+            </svg>
+          </div>
+        </div>
+        <div class="capsule"><div class="capsule-fill" id="capsuleFill"></div></div>
+        <div class="next-dose" id="nextDose">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor"/>
+            <path d="M6.5 3.5V6.5L8.5 7.8" stroke="currentColor" stroke-linecap="round"/>
+          </svg>
+          Следующий приём в <b id="nextDoseTime">--:--</b>
+        </div>
+      </div>
+
+      <div class="section-title">Расписание на сегодня</div>
+      <div class="tl" id="timeline"></div>
+    </div>
+
+    <!-- STATS -->
+    <div class="page" id="pageStats">
+      <div class="page-header">Статистика</div>
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-glow" style="background:radial-gradient(circle,var(--clay),transparent)"></div>
+          <div class="stat-val" id="stTotal">0</div>
+          <div class="stat-lbl">Приёмов сегодня</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-glow" style="background:radial-gradient(circle,var(--sage),transparent)"></div>
+          <div class="stat-val" id="stTaken">0</div>
+          <div class="stat-lbl">Принято</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-glow" style="background:radial-gradient(circle,var(--amber),transparent)"></div>
+          <div class="stat-val" id="stStreak">0</div>
+          <div class="stat-lbl">Серия дней 🔥</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-glow" style="background:radial-gradient(circle,var(--rose),transparent)"></div>
+          <div class="stat-val" id="stPills">0</div>
+          <div class="stat-lbl">Лекарств</div>
+        </div>
+      </div>
+      <div class="week-chart">
+        <div class="week-title">Активность за неделю</div>
+        <div class="bars" id="weekBars"></div>
+      </div>
+    </div>
+
+    <!-- FAMILY -->
+    <div class="page" id="pageFamily">
+      <div class="page-header">Моя семья</div>
+
+      <div class="fam-code-card">
+        <div class="fam-code-lbl">Ваш код для близких</div>
+        <div class="fam-code-val" id="famCode">------</div>
+        <div class="fam-code-name" id="famName"></div>
+        <button class="fam-code-copy" id="famCopy">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          Скопировать
+        </button>
+      </div>
+
+      <div id="famRequests"></div>
+
+      <div class="fam-add">
+        <div class="seg" id="segFamMode" style="margin-bottom:12px">
+          <button type="button" class="seg-btn sel" data-v="code">По коду</button>
+          <button type="button" class="seg-btn" data-v="username">По @username</button>
+        </div>
+
+        <div id="famAddCode">
+          <div class="fam-add-title">Добавить по коду</div>
+          <div class="fam-add-row" style="margin-bottom:8px">
+            <input id="famInputCode" placeholder="Код (6 символов)" maxlength="6" style="text-transform:uppercase;letter-spacing:2px;font-family:var(--display)">
+          </div>
+          <div class="fam-add-row" style="margin-bottom:8px">
+            <input id="famInputRel" placeholder="Кто это? (мама, папа...)">
+          </div>
+          <button class="fam-add-btn" id="famAddBtn" style="width:100%">Добавить</button>
+          <div class="fam-add-hint">Попросите близкого открыть вкладку «Семья» и продиктовать вам код.</div>
+        </div>
+
+        <div id="famAddUsername" style="display:none">
+          <div class="fam-add-title">Отправить запрос по @username</div>
+          <div class="fam-add-row" style="margin-bottom:8px">
+            <input id="famInputUser" placeholder="@username" autocapitalize="off" autocomplete="off">
+          </div>
+          <div class="fam-add-row" style="margin-bottom:8px">
+            <input id="famInputUserRel" placeholder="Кто это? (мама, папа...)">
+          </div>
+          <button class="fam-add-btn" id="famReqBtn" style="width:100%">Отправить запрос</button>
+          <div class="fam-add-hint">Для близких из Telegram-версии Pillio: запрос придёт им в чат с ботом.</div>
+        </div>
+      </div>
+
+      <div class="section-title">Участники</div>
+      <div id="famFollowing"></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="page" id="pageSettings">
+      <div class="page-header">Настройки</div>
+      <div class="set-group">
+        <div class="set-item" id="setExport">
+          <div class="set-ic" style="background:var(--sage-bg);color:var(--sage)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          </div>
+          <div class="set-info"><div class="si-title">Экспорт данных</div><div class="si-desc">Скачать историю приёмов</div></div>
+          <div class="set-arrow">›</div>
+        </div>
+        <div class="set-item" id="setReset">
+          <div class="set-ic" style="background:var(--clay-bg);color:var(--clay)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+          </div>
+          <div class="set-info"><div class="si-title">Сбросить данные</div><div class="si-desc">Удалить все лекарства</div></div>
+          <div class="set-arrow">›</div>
+        </div>
+      </div>
+      <div class="set-group">
+        <div class="set-item">
+          <div class="set-ic" style="background:var(--honey-bg);color:var(--amber)">
+            <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="8" width="17" height="8" rx="4" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v8" stroke="currentColor" stroke-width="1.6"/></svg>
+          </div>
+          <div class="set-info"><div class="si-title">Pillio v2.0</div><div class="si-desc">Автономное приложение — данные хранятся на устройстве</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <button class="fab" id="fab">+</button>
+
+  <!-- TAB BAR -->
+  <div class="tab-bar">
+    <button class="tab active" data-p="pageHome">
+      <span class="tab-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>
+      </span>
+      Главная
+    </button>
+    <button class="tab" data-p="pageStats">
+      <span class="tab-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 20V14M9 20V9M14 20V4M19 20V11"/></svg>
+      </span>
+      Статистика
+    </button>
+    <button class="tab" data-p="pageFamily">
+      <span class="tab-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+      </span>
+      Семья
+    </button>
+    <button class="tab" data-p="pageSettings">
+      <span class="tab-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </span>
+      Настройки
+    </button>
+  </div>
+</div>
+
+<!-- ── MODAL ──────────────────────────────────────────────────────── -->
+<div class="ov" id="ov">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Новое лекарство</div>
+    <div class="field">
+      <label>Иконка</label>
+      <div class="icon-picker" id="iconPicker">
+        <button type="button" class="icon-btn sel" data-icon="💊">💊</button>
+        <button type="button" class="icon-btn" data-icon="💉">💉</button>
+        <button type="button" class="icon-btn" data-icon="💧">💧</button>
+        <button type="button" class="icon-btn" data-icon="🩹">🩹</button>
+        <button type="button" class="icon-btn" data-icon="💨">💨</button>
+        <button type="button" class="icon-btn" data-icon="🧴">🧴</button>
+        <button type="button" class="icon-btn" data-icon="❤️">❤️</button>
+        <button type="button" class="icon-btn" data-icon="🧬">🧬</button>
+      </div>
+    </div>
+    <div class="field"><label>Название</label><input id="fN" placeholder="Парацетамол"></div>
+    <div class="row">
+      <div class="field"><label>Дозировка</label><input id="fD" type="number" placeholder="500"></div>
+      <div class="field"><label>Единица</label><select id="fU"><option>мг</option><option>мл</option><option>шт.</option></select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Интервал (ч)</label><input id="fI" type="number" value="8" min="1" max="24"></div>
+      <div class="field"><label>Первый приём</label><input id="fS" type="time" value="08:00"></div>
+    </div>
+    <div class="field">
+      <label>Связь с едой</label>
+      <div class="seg" id="segMeal">
+        <button type="button" class="seg-btn" data-v="before">До еды</button>
+        <button type="button" class="seg-btn" data-v="during">Во время</button>
+        <button type="button" class="seg-btn" data-v="after">После</button>
+        <button type="button" class="seg-btn sel" data-v="none">Неважно</button>
+      </div>
+    </div>
+    <div class="field"><label>Курс (дней, 0 = бессрочно)</label><input id="fC" type="number" value="0" min="0" placeholder="7"></div>
+    <button class="btn-sub" id="btnSave">Добавить</button>
+  </div>
+</div>
+
+<!-- ── FAMILY MEMBER DETAIL MODAL ─────────────────────────────────── -->
+<div class="ov" id="famOv">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="fd-head">
+      <div class="fd-avatar" id="fdAvatar"></div>
+      <div>
+        <div class="fd-name" id="fdName"></div>
+        <div class="fd-rel" id="fdRel"></div>
+      </div>
+    </div>
+    <div class="fd-stats">
+      <div class="fd-stat"><div class="fd-val" id="fdPct">0%</div><div class="fd-lbl">Прогресс</div></div>
+      <div class="fd-stat"><div class="fd-val" id="fdStreak">0</div><div class="fd-lbl">Серия дней</div></div>
+      <div class="fd-stat"><div class="fd-val" id="fdTaken">0/0</div><div class="fd-lbl">Принято</div></div>
+    </div>
+    <div class="fd-sec">Лекарства сегодня</div>
+    <div id="fdItems"></div>
+    <button class="btn-fam-rename" id="fdRenameBtn">✎ Изменить имя</button>
+    <button class="btn-fam-remove" id="fdRemoveBtn">Удалить из семьи</button>
+  </div>
+</div>
+
+<!-- ── AI ASSISTANT MODAL ─────────────────────────────────────────── -->
+<div class="ov" id="aiOv">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">✨ AI-помощник</div>
+    <div id="aiLog"></div>
+    <div style="display:flex;gap:8px">
+      <input id="aiInput" placeholder="Спросите про ваши лекарства...">
+      <button id="aiSend">➤</button>
+    </div>
+    <div class="fam-add-hint" style="margin-top:10px">Помощник не заменяет врача. Нужно подключение к интернету.</div>
+  </div>
+</div>
+<style>
+#aiLog{max-height:44vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.ai-msg{max-width:85%;padding:10px 14px;border-radius:14px;font-size:13.5px;line-height:1.5;white-space:pre-wrap}
+.ai-msg.user{align-self:flex-end;background:var(--glow2);border:1px solid var(--amber);color:var(--text)}
+.ai-msg.bot{align-self:flex-start;background:var(--card2);border:1px solid var(--border);color:var(--text2)}
+#aiInput{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px 14px;color:var(--text);font-size:14px;outline:none}
+#aiSend{width:46px;border-radius:12px;border:none;background:var(--amber);color:#1a1407;font-size:16px;cursor:pointer}
+</style>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+// Pillio (автономная версия для Android / Google Play)
+// Все данные хранятся на устройстве (localStorage), сервер не нужен.
+// Логика расписания перенесена из C++-бэкенда (tracker/storage).
+// ════════════════════════════════════════════════════════════════════
+const API = '';          // оставлено для совместимости URL-ов ниже
+const tg  = null;        // Telegram отсутствует в автономной версии
+
+// Адрес сервера Pillio — нужен только для «Семьи» и AI-помощника.
+// Лекарства и расписание работают полностью офлайн.
+const SERVER = 'https://pillio-dodoevsamad1.replit.app';
+
+// ── Идентичность устройства (для семейного доступа) ─────────────────
+// Стабильный числовой id (аналог chat_id в Telegram-версии).
+let UID = localStorage.getItem('pillio_uid') || '';
+if (!UID) {
+  UID = String(Date.now()) + String(Math.floor(Math.random() * 900) + 100);
+  try { localStorage.setItem('pillio_uid', UID); } catch {}
+}
+let UNAME = localStorage.getItem('pillio_uname') || '';
+let UNICK = '';
+
+// Спрашиваем имя один раз — близкие увидят его в своём списке семьи.
+function ensureUserName() {
+  if (UNAME) return;
+  const n = (prompt('Как вас зовут? Это имя увидят ваши близкие.') || '').trim();
+  UNAME = n || 'Пользователь';
+  try { localStorage.setItem('pillio_uname', UNAME); } catch {}
+}
+
+// fetch к реальному серверу (семья, синхронизация)
+function rfetch(path, opts = {}) {
+  opts.headers = Object.assign(
+    { 'Content-Type': 'application/json', 'X-Pillio-Uid': String(UID) },
+    opts.headers);
+  return fetch(SERVER + path, opts);
+}
+
+// ── Локальная «база данных»: { pills: [...], schedules: [...] } ─────
+const DB_KEY = 'pillio_db';
+function dbLoad() {
+  try { return JSON.parse(localStorage.getItem(DB_KEY)) || { pills: [], schedules: [] }; }
+  catch { return { pills: [], schedules: [] }; }
+}
+function dbSave(db) { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch {} }
+const pad2 = n => String(n).padStart(2, '0');
+
+// Порт generateDailySlots из tracker.cpp: слоты от start_hour с шагом
+// interval_hours до конца суток.
+function genDailySlots(pill, dateISO) {
+  const slots = [];
+  for (let t = pill.start_hour * 60 + pill.start_minute; t < 24 * 60; t += pill.interval_hours * 60) {
+    slots.push({
+      pill_id: pill.id,
+      scheduled_time: dateISO + 'T' + pad2(Math.floor(t / 60)) + ':' + pad2(t % 60) + ':00',
+      taken: false, taken_at: ''
+    });
+  }
+  return slots;
+}
+
+// Порт ensureDailySlots из main.cpp: дозаполняет недостающие слоты дня.
+function ensureSlots(db, dateISO) {
+  for (const p of db.pills) {
+    for (const s of genDailySlots(p, dateISO)) {
+      if (!db.schedules.some(e => e.pill_id === s.pill_id && e.scheduled_time === s.scheduled_time)) {
+        db.schedules.push(s);
+      }
+    }
+  }
+}
+
+const schedForDate = (db, dateISO) => db.schedules.filter(s => s.scheduled_time.startsWith(dateISO));
+
+// Порт computeStreak из main.cpp: дни подряд со 100% приёмом (со вчера назад).
+function streakLocal(db) {
+  let streak = 0;
+  for (let d = 1; d <= 365; d++) {
+    const dt = new Date(); dt.setDate(dt.getDate() - d);
+    const iso = dt.getFullYear() + '-' + pad2(dt.getMonth() + 1) + '-' + pad2(dt.getDate());
+    const ss = schedForDate(db, iso);
+    if (!ss.length) break;
+    if (ss.every(s => s.taken)) streak++; else break;
+  }
+  return streak;
+}
+
+// ── Локальный API: та же сигнатура, что у fetch, те же маршруты ─────
+// UI-код не меняется: apiFetch('/api/...') теперь работает без сервера.
+const resp = (body, status = 200) => ({ ok: status < 300, status, json: async () => body });
+
+async function apiFetch(url, opts = {}) {
+  const u = new URL(url, 'http://local');
+  const path = u.pathname;
+  const method = (opts.method || 'GET').toUpperCase();
+
+  // «Семья» живёт на реальном сервере (нужен интернет) — проксируем туда.
+  if (path.startsWith('/api/family')) {
+    opts.headers = Object.assign({}, opts.headers, { 'X-Pillio-Uid': String(UID) });
+    return fetch(SERVER + path + u.search, opts);
+  }
+
+  const db = dbLoad();
+
+  if (path === '/api/pills' && method === 'GET') return resp(db.pills);
+
+  if (path === '/api/pills' && method === 'POST') {
+    const p = JSON.parse(opts.body);
+    if (!p.name) return resp({ error: 'Введите название' }, 422);
+    if (!(p.dosage > 0)) return resp({ error: 'Дозировка должна быть положительной' }, 422);
+    p.id = db.pills.reduce((m, x) => Math.max(m, x.id), 0) + 1;
+    db.pills.push(p);
+    ensureSlots(db, todayISO());
+    dbSave(db);
+    rescheduleNotifications();
+    syncToServer();
+    return resp(p, 201);
+  }
+
+  const del = path.match(/^\/api\/pills\/(\d+)$/);
+  if (del && method === 'DELETE') {
+    const id = +del[1];
+    db.pills = db.pills.filter(p => p.id !== id);
+    db.schedules = db.schedules.filter(s => s.pill_id !== id);
+    dbSave(db);
+    rescheduleNotifications();
+    syncToServer();
+    return resp({ ok: true });
+  }
+
+  if (path === '/api/schedule') {
+    const date = u.searchParams.get('date') || todayISO();
+    ensureSlots(db, date); dbSave(db);
+    const ss = schedForDate(db, date).map(s => {
+      const p = db.pills.find(x => x.id === s.pill_id) || {};
+      return { ...s, pill_name: p.name || '?', pill_dosage: p.dosage || 0,
+               pill_unit: p.unit || '', meal_relation: p.meal_relation || 'none',
+               course_days: p.course_days || 0 };
+    });
+    const progress = ss.length ? ss.filter(s => s.taken).length / ss.length : 0;
+    return resp({ date, schedules: ss, progress });
+  }
+
+  if (path === '/api/take' && method === 'POST') {
+    const b = JSON.parse(opts.body);
+    const s = db.schedules.find(x => x.pill_id === b.pill_id && x.scheduled_time === b.scheduled_time);
+    if (!s) return resp({ error: 'Слот не найден' }, 404);
+    const n = new Date();
+    s.taken = true;
+    s.taken_at = n.getFullYear() + '-' + pad2(n.getMonth() + 1) + '-' + pad2(n.getDate()) +
+                 'T' + pad2(n.getHours()) + ':' + pad2(n.getMinutes()) + ':' + pad2(n.getSeconds());
+    dbSave(db);
+    syncToServer();
+    return resp({ ok: true, taken_at: s.taken_at });
+  }
+
+  if (path === '/api/stats') {
+    ensureSlots(db, todayISO()); dbSave(db);
+    const ss = schedForDate(db, todayISO());
+    const taken = ss.filter(s => s.taken).length;
+    return resp({ streak: streakLocal(db), total_pills: db.pills.length,
+                  today_total: ss.length, today_taken: taken,
+                  progress: ss.length ? taken / ss.length : 0 });
+  }
+
+  return resp({ error: 'Не найдено' }, 404);
+}
+
+// ── Синхронизация с сервером (для семейного доступа) ────────────────
+// Лекарства и отметки зеркалируются в профиль на сервере, чтобы близкие
+// видели реальный прогресс. Офлайн — молча пропускается, ничего не ломая.
+// Соответствие локальный id → серверный id хранится в pillio_idmap.
+let syncBusy = false;
+async function syncToServer() {
+  if (syncBusy) return;
+  syncBusy = true;
+  try {
+    const db = dbLoad();
+    const map = JSON.parse(localStorage.getItem('pillio_idmap') || '{}');
+    const remote = await (await rfetch('/api/pills')).json();
+
+    // 1) Создаём на сервере лекарства, которых там ещё нет
+    for (const p of db.pills) {
+      let rid = map[p.id];
+      if (!rid || !remote.some(r => r.id === rid)) {
+        const r = await rfetch('/api/pills', { method: 'POST', body: JSON.stringify({ ...p, id: 0 }) });
+        if (r.ok) { rid = (await r.json()).id; map[p.id] = rid; }
+      }
+    }
+    // 2) Удаляем с сервера лекарства, удалённые локально
+    const known = new Set(db.pills.map(p => map[p.id]).filter(Boolean));
+    for (const r of remote) {
+      if (!known.has(r.id)) await rfetch('/api/pills/' + r.id, { method: 'DELETE' });
+    }
+    // 3) Повторяем сегодняшние отметки «принято»
+    const today = todayISO();
+    const rsch = await (await rfetch('/api/schedule?date=' + today)).json();
+    for (const s of db.schedules.filter(x => x.taken && x.scheduled_time.startsWith(today))) {
+      const rid = map[s.pill_id];
+      if (!rid) continue;
+      const rslot = (rsch.schedules || []).find(
+        x => x.pill_id === rid && x.scheduled_time === s.scheduled_time && !x.taken);
+      if (rslot) {
+        await rfetch('/api/take', { method: 'POST',
+          body: JSON.stringify({ pill_id: rid, scheduled_time: s.scheduled_time }) });
+      }
+    }
+    localStorage.setItem('pillio_idmap', JSON.stringify(map));
+  } catch { /* офлайн или сервер недоступен — приложение работает локально */ }
+  finally { syncBusy = false; }
+}
+
+// ── Нативные уведомления (Capacitor Local Notifications) ────────────
+// Время напоминания подстраивается под связь с едой: слот — это время
+// еды/приёма, а уведомление сдвигается так, чтобы успеть принять верно.
+// В обычном браузере плагина нет — функция тихо ничего не делает.
+const MEAL_OFFSET_MIN = { before: -30, during: 0, after: 20 };
+const MEAL_NOTIF_TEXT = {
+  before: 'примите сейчас — за 30 минут до еды',
+  during: 'примите во время еды',
+  after:  'примите сейчас — после еды'
+};
+
+async function rescheduleNotifications() {
+  const LN = window.Capacitor?.Plugins?.LocalNotifications;
+  if (!LN) return;
+  try {
+    const perm = await LN.requestPermissions();
+    if (perm.display !== 'granted') return;
+    const pending = await LN.getPending();
+    if (pending.notifications?.length) {
+      await LN.cancel({ notifications: pending.notifications.map(n => ({ id: n.id })) });
+    }
+    const db = dbLoad();
+    const now = new Date();
+    const notifs = [];
+    let id = 1;
+    // Планируем слоты на 7 дней вперёд (максимум 60 уведомлений)
+    outer:
+    for (let d = 0; d < 7; d++) {
+      const dt = new Date(); dt.setDate(now.getDate() + d);
+      const iso = dt.getFullYear() + '-' + pad2(dt.getMonth() + 1) + '-' + pad2(dt.getDate());
+      for (const p of db.pills) {
+        const offsetMs = (MEAL_OFFSET_MIN[p.meal_relation] || 0) * 60000;
+        for (const s of genDailySlots(p, iso)) {
+          const at = new Date(new Date(s.scheduled_time).getTime() + offsetMs);
+          if (at <= now) continue;
+          const ex = db.schedules.find(x => x.pill_id === s.pill_id && x.scheduled_time === s.scheduled_time);
+          if (ex?.taken) continue;
+          const hint = MEAL_NOTIF_TEXT[p.meal_relation];
+          notifs.push({
+            id: id++,
+            title: '💊 Пора принять лекарство',
+            body: `${p.name} ${p.dosage} ${p.unit}${hint ? ' — ' + hint : ''}`,
+            schedule: { at }
+          });
+          if (notifs.length >= 60) break outer;
+        }
+      }
+    }
+    if (notifs.length) await LN.schedule({ notifications: notifs });
+  } catch (e) { console.warn('notifications:', e); }
+}
+
+const haptic = () => { try { navigator.vibrate?.(10) } catch {} };
+const $        = id => document.getElementById(id);
+const COLORS   = ['ic-amber', 'ic-sage', 'ic-clay', 'ic-rose'];
+const initials = s => (s || '?').trim().split(/\s+/).map(w => w[0]).join('').substring(0, 2).toUpperCase();
+
+// ── Theme (светлая / тёмная) ─────────────────────────────────────────
+let theme = (() => { try { return localStorage.getItem('pillio_theme') || 'dark'; } catch { return 'dark'; } })();
+function applyTheme(t) {
+  if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  else document.documentElement.removeAttribute('data-theme');
+  const c = t === 'light' ? '#FAF4E8' : '#0C0A07';
+  try { tg?.setHeaderColor(c) } catch {}
+  try { tg?.setBackgroundColor(c) } catch {}
+}
+applyTheme(theme);
+$('themeToggle').onclick = () => {
+  haptic();
+  theme = theme === 'light' ? 'dark' : 'light';
+  try { localStorage.setItem('pillio_theme', theme); } catch {}
+  applyTheme(theme);
+};
+
+// ── Onboarding ──────────────────────────────────────────────────────
+let obIdx = 0;
+const obDone = localStorage.getItem('pillio_ob') || '';
+if (obDone) { $('onboarding').style.display = 'none'; $('app').style.display = 'flex'; }
+
+$('obBtn').onclick = () => {
+  haptic(); obIdx++;
+  if (obIdx < 3) {
+    $('obSlides').children[obIdx].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+    document.querySelectorAll('.ob-dot').forEach((d, i) => d.classList.toggle('active', i === obIdx));
+    if (obIdx === 2) $('obBtn').textContent = 'Начать';
+  } else {
+    localStorage.setItem('pillio_ob', '1');
+    $('onboarding').classList.add('hide');
+    setTimeout(() => { $('onboarding').style.display = 'none'; $('app').style.display = 'flex'; initApp(); }, 500);
+  }
+};
+
+// ── Tabs ────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  haptic();
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  $(t.dataset.p).classList.add('active');
+  // FAB добавления лекарств — только на главной
+  $('fab').classList.toggle('hidden', t.dataset.p !== 'pageHome');
+  if (t.dataset.p === 'pageStats') loadStats();
+  if (t.dataset.p === 'pageFamily') { ensureUserName(); syncToServer(); loadFamily(); startFamilyPolling(); }
+  else stopFamilyPolling();
+});
+
+// ── Icon picker ─────────────────────────────────────────────────────
+let selectedIcon = '💊';
+const iconMap = (() => { try { return JSON.parse(localStorage.getItem('pillio_icons') || '{}'); } catch { return {}; } })();
+function saveIconMap() { try { localStorage.setItem('pillio_icons', JSON.stringify(iconMap)); } catch {} }
+document.querySelectorAll('#iconPicker .icon-btn').forEach(b => b.onclick = () => {
+  haptic();
+  document.querySelectorAll('#iconPicker .icon-btn').forEach(x => x.classList.remove('sel'));
+  b.classList.add('sel'); selectedIcon = b.dataset.icon;
+});
+
+// ── Meal segment ────────────────────────────────────────────────────
+let selectedMeal = 'none';
+document.querySelectorAll('#segMeal .seg-btn').forEach(b => b.onclick = () => {
+  haptic();
+  document.querySelectorAll('#segMeal .seg-btn').forEach(x => x.classList.remove('sel'));
+  b.classList.add('sel'); selectedMeal = b.dataset.v;
+});
+
+// ── Header ──────────────────────────────────────────────────────────
+function initHeader() {
+  const h = new Date().getHours();
+  const name = tg?.initDataUnsafe?.user?.first_name || '';
+  const greet = h < 6 ? 'Доброй ночи' : h < 12 ? 'Доброе утро' : h < 18 ? 'Добрый день' : 'Добрый вечер';
+  $('greet').textContent    = name ? `${greet}, ${name}` : greet;
+  $('dateDisp').textContent = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+function todayISO() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// ── Capsule progress ─────────────────────────────────────────────────
+function setProgress(pct) {
+  $('capsuleFill').style.width = Math.max(3, pct * 100) + '%';
+  $('ringPct').textContent     = Math.round(pct * 100) + '%';
+}
+
+// ── Load schedule ────────────────────────────────────────────────────
+async function loadSchedule() {
+  try {
+    const r = await apiFetch(`${API}/api/schedule?date=${todayISO()}`);
+    const d = await r.json();
+    setProgress(d.progress || 0);
+    const total = d.schedules?.length || 0;
+    const taken = d.schedules?.filter(s => s.taken).length || 0;
+    $('progDesc').textContent = total ? `${taken} из ${total} доз принято` : 'Нет приёмов на сегодня';
+    renderTimeline(d.schedules || []);
+    updateNextDose(d.schedules || []);
+    computeStreak();
+  } catch (e) {
+    console.error(e);
+    $('timeline').innerHTML = '<div class="empty"><div class="empty-txt">Не удаётся подключиться к серверу</div></div>';
+  }
+}
+
+// ── Next dose ────────────────────────────────────────────────────────
+function updateNextDose(scheds) {
+  const nd = $('nextDose');
+  const now = new Date();
+  const upcoming = scheds
+    .filter(s => !s.taken)
+    .map(s => ({ ...s, dt: new Date(s.scheduled_time) }))
+    .filter(s => s.dt > now)
+    .sort((a, b) => a.dt - b.dt);
+  if (upcoming.length) {
+    $('nextDoseTime').textContent = upcoming[0].dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    nd.style.display = 'inline-flex';
+  } else {
+    nd.style.display = 'none';
+  }
+}
+
+// ── Render timeline ──────────────────────────────────────────────────
+const MEAL_LABELS = { before: 'До еды', during: 'Во время', after: 'После еды' };
+
+function renderTimeline(scheds) {
+  const tl = $('timeline');
+  if (!scheds.length) {
+    tl.innerHTML = '<div class="empty"><div class="empty-ic"><svg viewBox="0 0 40 40" fill="none"><rect x="6" y="14" width="28" height="13" rx="6.5" stroke="#8C8270" stroke-width="1.6"/><path d="M20 14v13" stroke="#8C8270" stroke-width="1.6"/></svg></div><div class="empty-txt">Нажмите + чтобы добавить лекарство</div></div>';
+    return;
+  }
+  const groups = {};
+  scheds.forEach(s => { const t = s.scheduled_time.substring(11, 16); if (!groups[t]) groups[t] = []; groups[t].push(s); });
+  let html = '';
+  Object.keys(groups).sort().forEach(time => {
+    html += `<div class="slot"><div class="slot-dot"></div><div class="slot-time">${time}</div>`;
+    const mealUntaken  = groups[time].filter(s => !s.taken && s.meal_relation && s.meal_relation !== 'none');
+    const hasMealGroup = mealUntaken.length >= 2;
+    groups[time].forEach((s, i) => {
+      const c  = COLORS[s.pill_id % COLORS.length];
+      const mr = s.meal_relation || 'none';
+      const mealBadge = MEAL_LABELS[mr] ? `<span class="meal-badge ${mr}">${MEAL_LABELS[mr]}</span>` : '';
+      const icon = iconMap[s.pill_id];
+      html += `<div class="card" style="animation-delay:${i * .07}s">
+        <div class="card-ic ${c}${icon ? ' has-emoji' : ''}">${icon || initials(s.pill_name)}</div>
+        <div class="card-info">
+          <div class="card-name">${esc(s.pill_name)}</div>
+          <div class="card-dose">${s.pill_dosage}&thinsp;${esc(s.pill_unit)}${mealBadge}</div>
+        </div>
+        ${s.taken ? `<button class="btn-take done">✓</button>` : `<button class="btn-take" onclick="takePill(${s.pill_id},'${s.scheduled_time}')">Принять</button>`}
+        <button class="btn-del" onclick="delPill(${s.pill_id})">✕</button>
+      </div>`;
+    });
+    if (hasMealGroup) {
+      const ids = mealUntaken.map(s => `${s.pill_id}|${s.scheduled_time}`);
+      html += `<button class="btn-take-all" onclick="takeAllMeal('${ids.join(',')}')">Принять всё за приём</button>`;
+    }
+    html += '</div>';
+  });
+  tl.innerHTML = html;
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ── Take pill ────────────────────────────────────────────────────────
+async function takePill(pid, st) {
+  haptic();
+  try {
+    const r = await apiFetch(`${API}/api/take`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pill_id: pid, scheduled_time: st }) });
+    if (r.ok) { showToast('Принято ✓'); loadSchedule(); rescheduleNotifications(); }
+    else { const e = await r.json(); showToast('⚠ ' + (e.error || 'Ошибка')); }
+  } catch { showToast('⚠ Ошибка'); }
+}
+
+// ── Take all meal ────────────────────────────────────────────────────
+async function takeAllMeal(idsStr) {
+  haptic();
+  const pairs = idsStr.split(',').map(p => { const [pid, st] = p.split('|'); return { pill_id: parseInt(pid), scheduled_time: st }; });
+  let ok = 0;
+  for (const p of pairs) { try { const r = await apiFetch(`${API}/api/take`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }); if (r.ok) ok++; } catch {} }
+  showToast(`Принято ${ok} из ${pairs.length}`); loadSchedule(); rescheduleNotifications();
+}
+
+// ── Delete pill ──────────────────────────────────────────────────────
+async function delPill(pid) {
+  haptic(); if (!confirm('Удалить лекарство?')) return;
+  try { await apiFetch(`${API}/api/pills/${pid}`, { method: 'DELETE' }); showToast('Удалено'); loadSchedule(); }
+  catch { showToast('⚠ Ошибка'); }
+}
+
+// ── Modal ────────────────────────────────────────────────────────────
+function openModal()  { haptic(); $('ov').classList.add('open');    try { tg?.BackButton?.show() } catch {} }
+function closeModal() {           $('ov').classList.remove('open'); try { tg?.BackButton?.hide() } catch {} }
+$('fab').onclick = openModal;
+$('ov').onclick  = e => { if (e.target === $('ov')) closeModal(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+$('btnSave').onclick = async () => {
+  haptic();
+  const name     = $('fN').value.trim();
+  const dosage   = parseFloat($('fD').value);
+  const unit     = $('fU').value;
+  const interval = parseInt($('fI').value) || 8;
+  const [sh, sm] = ($('fS').value || '08:00').split(':').map(Number);
+  const meal_relation = selectedMeal;
+  const course_days   = parseInt($('fC').value) || 0;
+  if (!name)                  { showToast('⚠ Введите название'); return; }
+  if (!dosage || dosage <= 0) { showToast('⚠ Введите дозировку'); return; }
+  try {
+    const r = await apiFetch(`${API}/api/pills`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: 0, name, dosage, unit, interval_hours: interval, start_hour: sh, start_minute: sm, meal_relation, course_days }) });
+    if (r.ok) {
+      const saved = await r.json();
+      iconMap[saved.id] = selectedIcon;
+      saveIconMap();
+      try { tg?.HapticFeedback?.notificationOccurred('success') } catch {}
+      showToast('Добавлено!'); closeModal();
+      $('fN').value = ''; $('fD').value = '';
+      selectedIcon = '💊';
+      document.querySelectorAll('#iconPicker .icon-btn').forEach((b, i) => b.classList.toggle('sel', i === 0));
+      loadSchedule();
+    }
+    else { const e = await r.json(); showToast('⚠ ' + (e.error || 'Ошибка')); }
+  } catch { showToast('⚠ Ошибка'); }
+};
+
+// ── Streak ───────────────────────────────────────────────────────────
+async function computeStreak() {
+  try {
+    const r = await apiFetch(`${API}/api/stats`);
+    if (r.ok) { const d = await r.json(); $('streak').innerHTML = '🔥 ' + (d.streak || 0) + ' дн.'; $('stStreak').textContent = d.streak || 0; }
+    else { $('streak').innerHTML = '🔥 0 дн.'; }
+  } catch { $('streak').innerHTML = '🔥 0 дн.'; }
+}
+
+// ── Stats ────────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const pills = await (await apiFetch(`${API}/api/pills`)).json();
+    $('stPills').textContent = pills.length;
+    const d = await (await apiFetch(`${API}/api/schedule?date=${todayISO()}`)).json();
+    const scheds = d.schedules || [];
+    $('stTotal').textContent = scheds.length;
+    $('stTaken').textContent = scheds.filter(s => s.taken).length;
+    renderWeek();
+  } catch (e) { console.error(e); }
+}
+
+async function renderWeek() {
+  const days  = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const bars  = $('weekBars');
+  const today = new Date();
+  const dow   = today.getDay() || 7;
+  let html    = '';
+  for (let i = 6; i >= 0; i--) {
+    const d   = new Date(today); d.setDate(today.getDate() - (dow - 1) + i - 6 + 6);
+    const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    let pct   = 0;
+    try { const r = await apiFetch(`${API}/api/schedule?date=${iso}`); if (r.ok) { const data = await r.json(); pct = data.progress || 0; } } catch {}
+    const h      = Math.max(4, pct * 100);
+    const dayIdx = (d.getDay() + 6) % 7;
+    html += `<div class="bar-wrap"><div class="bar" style="height:76px"><div class="bar-inner" style="height:${h}%"></div></div><div class="bar-day">${days[dayIdx]}</div></div>`;
+  }
+  bars.innerHTML = html;
+}
+
+// ── Family ──────────────────────────────────────────────────────────
+let followingCache = [];
+
+const MEAL_FULL = { before: 'До еды', during: 'Во время еды', after: 'После еды', none: '' };
+
+async function openFamMember(idx) {
+  haptic();
+  const f = followingCache[idx];
+  if (!f) return;
+
+  // Показываем модалку сразу с кэшированными данными
+  renderFamDetail(f);
+  $('famOv').classList.add('open');
+
+  // Подгружаем свежие данные с сервера
+  try {
+    const r = await apiFetch(`${API}/api/family/members?uid=${UID}`);
+    if (r.ok) {
+      const d = await r.json();
+      const fresh = (d.members || []).find(m => m.chat_id === f.chat_id);
+      if (fresh) renderFamDetail(fresh);
+    }
+  } catch {}
+}
+
+function renderFamDetail(f) {
+  const st = f.status || {};
+  const av = COLORS[Math.abs(f.chat_id) % COLORS.length];
+  const avEl = $('fdAvatar');
+  avEl.className = 'fd-avatar ' + av;
+  avEl.textContent = initials(f.name);
+  $('fdName').textContent = f.name || '?';
+  $('fdRel').textContent = f.relation || '';
+  $('fdPct').textContent = Math.round((st.progress || 0) * 100) + '%';
+  $('fdStreak').innerHTML = '🔥 ' + (st.streak || 0);
+  $('fdTaken').textContent = (st.taken || 0) + '/' + (st.total || 0);
+  $('fdRemoveBtn').onclick = () => famUnlink(f.chat_id);
+  $('fdRenameBtn').onclick = () => famRelabel(f.chat_id, f.relation || f.profile_name || '');
+
+  const items = st.items || [];
+  const box = $('fdItems');
+  if (!items.length) {
+    box.innerHTML = '<div class="empty"><div class="empty-txt">Нет приёмов на сегодня</div></div>';
+  } else {
+    box.innerHTML = items.map(it => {
+      const time = (it.scheduled_time || '').substring(11, 16);
+      const meal = MEAL_FULL[it.meal_relation] || '';
+      const c = COLORS[Math.abs((it.pill_name || '').length) % COLORS.length];
+      return `<div class="fd-item">
+        <div class="fd-item-ic ${c}">${initials(it.pill_name)}</div>
+        <div class="fd-item-info">
+          <div class="fd-item-name">${esc(it.pill_name)}</div>
+          <div class="fd-item-meta">${time} · ${it.dosage}&thinsp;${esc(it.unit)}${meal ? ' · ' + meal : ''}</div>
+        </div>
+        <div class="fd-item-state ${it.taken ? 'taken' : 'pending'}">${it.taken ? '✓ принято' : 'ожидает'}</div>
+      </div>`;
+    }).join('');
+  }
+}
+function closeFamMember() { $('famOv').classList.remove('open'); }
+$('famOv').onclick = e => { if (e.target === $('famOv')) closeFamMember(); };
+
+// Автообновление, пока открыта вкладка «Семья»
+let famPollTimer = null;
+function startFamilyPolling() {
+  stopFamilyPolling();
+  famPollTimer = setInterval(() => {
+    if ($('pageFamily').classList.contains('active') && !$('famOv').classList.contains('open')) {
+      loadFamily();
+    }
+  }, 12000);
+}
+function stopFamilyPolling() { if (famPollTimer) { clearInterval(famPollTimer); famPollTimer = null; } }
+
+async function loadFamily() {
+  // Регистрируем/обновляем свой профиль и показываем код
+  try {
+    const r = await apiFetch(`${API}/api/family/me?uid=${UID}&name=${encodeURIComponent(UNAME)}&username=${encodeURIComponent(UNICK)}`);
+    if (r.ok) {
+      const d = await r.json();
+      $('famCode').textContent = d.share_code || '------';
+      $('famName').textContent = d.name || '';
+    }
+  } catch {
+    $('famCode').textContent = '------';
+    $('famName').textContent = 'Нет соединения с сервером';
+  }
+
+  loadRequests();
+
+  // Участники (объединённый список: за кем слежу + кто следит за мной)
+  try {
+    const r = await apiFetch(`${API}/api/family/members?uid=${UID}`);
+    if (r.ok) {
+      const d = await r.json();
+      const list = d.members || [];
+      followingCache = list;
+      const el = $('famFollowing');
+      if (!list.length) {
+        el.innerHTML = '<div class="empty"><div class="empty-txt">Добавьте близких по коду или @username</div></div>';
+      } else {
+        el.innerHTML = list.map((f, idx) => {
+          const pct = f.status ? Math.round((f.status.progress || 0) * 100) : 0;
+          const taken = f.status?.taken || 0;
+          const total = f.status?.total || 0;
+          const av = COLORS[Math.abs(f.chat_id) % COLORS.length];
+          return `<div class="fam-person clickable" onclick="openFamMember(${idx})">
+            <div class="fam-avatar ${av}">${initials(f.name)}</div>
+            <div class="fam-person-info">
+              <div class="fam-person-name">${esc(f.name)}</div>
+              <div class="fam-person-rel">${esc(f.relation)}</div>
+            </div>
+            <div class="fam-person-status">
+              <div class="fam-person-pct">${pct}%</div>
+              <div class="fam-person-sub">${taken}/${total}</div>
+            </div>
+            <div class="fam-chevron">›</div>
+          </div>`;
+        }).join('');
+      }
+    }
+  } catch {}
+
+}
+
+$('famCopy').onclick = () => {
+  haptic();
+  const code = $('famCode').textContent;
+  if (code && code !== '------') {
+    navigator.clipboard.writeText(code).then(() => showToast('Код скопирован!')).catch(() => showToast(code));
+  }
+};
+
+$('famAddBtn').onclick = async () => {
+  haptic();
+  const code = $('famInputCode').value.trim().toUpperCase();
+  const relation = $('famInputRel').value.trim();
+  if (!code || code.length !== 6) { showToast('⚠ Введите 6-символьный код'); return; }
+  if (!relation) { showToast('⚠ Укажите кто это'); return; }
+  try {
+    const r = await apiFetch(`${API}/api/family/follow`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: Number(UID), name: UNAME, code, relation })
+    });
+    if (r.ok) {
+      showToast('Добавлено!');
+      $('famInputCode').value = '';
+      $('famInputRel').value = '';
+      loadFamily();
+    } else {
+      const e = await r.json();
+      showToast('⚠ ' + (e.error || 'Ошибка'));
+    }
+  } catch { showToast('⚠ Сервер недоступен'); }
+};
+
+async function famRelabel(target, current) {
+  haptic();
+  const name = (prompt('Как назвать этого человека? (например: мама, брат, бабушка)', current || '') || '').trim();
+  if (!name) return;
+  try {
+    const r = await apiFetch(`${API}/api/family/relabel`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: Number(UID), target: Number(target), relation: name })
+    });
+    if (r.ok) {
+      showToast('Имя обновлено');
+      const fresh = followingCache.find(m => m.chat_id === target);
+      if (fresh) { fresh.relation = name; fresh.name = name; renderFamDetail(fresh); }
+      loadFamily();
+    } else {
+      const e = await r.json().catch(() => ({}));
+      showToast('⚠ ' + (e.error || 'Ошибка'));
+    }
+  } catch { showToast('⚠ Сервер недоступен'); }
+}
+
+async function famUnlink(target) {
+  haptic();
+  if (!confirm('Удалить из семьи?')) return;
+  try {
+    const r = await apiFetch(`${API}/api/family/follow?uid=${UID}&target=${target}`, { method: 'DELETE' });
+    if (r.ok) { showToast('Удалено из семьи'); closeFamMember(); loadFamily(); }
+    else showToast('⚠ Ошибка');
+  } catch { showToast('⚠ Сервер недоступен'); }
+}
+
+// Переключатель «по коду / по username»
+document.querySelectorAll('#segFamMode .seg-btn').forEach(b => b.onclick = () => {
+  haptic();
+  document.querySelectorAll('#segFamMode .seg-btn').forEach(x => x.classList.remove('sel'));
+  b.classList.add('sel');
+  const byUser = b.dataset.v === 'username';
+  $('famAddUsername').style.display = byUser ? 'block' : 'none';
+  $('famAddCode').style.display     = byUser ? 'none'  : 'block';
+});
+
+// Отправка запроса по @username (близким из Telegram-версии)
+$('famReqBtn').onclick = async () => {
+  haptic();
+  let uname = $('famInputUser').value.trim().replace(/^@/, '');
+  const relation = $('famInputUserRel').value.trim();
+  if (!uname)    { showToast('⚠ Введите @username'); return; }
+  if (!relation) { showToast('⚠ Укажите кто это'); return; }
+  try {
+    const r = await apiFetch(`${API}/api/family/request`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: Number(UID), name: UNAME, username: UNICK, target_username: uname, relation })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) {
+      showToast('Запрос отправлен!');
+      $('famInputUser').value = '';
+      $('famInputUserRel').value = '';
+    } else {
+      showToast('⚠ ' + (d.error || 'Ошибка'));
+    }
+  } catch { showToast('⚠ Сервер недоступен'); }
+};
+
+// Входящие запросы на добавление в семью
+async function loadRequests() {
+  try {
+    const r = await apiFetch(`${API}/api/family/requests?uid=${UID}`);
+    if (!r.ok) return;
+    const d = await r.json();
+    const reqs = d.requests || [];
+    const box = $('famRequests');
+    box.innerHTML = reqs.map(q => `
+      <div class="fam-req">
+        <div class="fam-req-txt"><b>${esc(q.from_name)}</b> хочет следить за вашим приёмом лекарств как «${esc(q.relation)}».</div>
+        <div class="fam-req-actions">
+          <button class="fam-req-btn fam-req-yes" onclick="answerRequest('${q.id}', true)">Принять</button>
+          <button class="fam-req-btn fam-req-no" onclick="answerRequest('${q.id}', false)">Отклонить</button>
+        </div>
+      </div>`).join('');
+  } catch {}
+}
+
+async function answerRequest(id, accept) {
+  haptic();
+  try {
+    const r = await apiFetch(`${API}/api/family/request/${accept ? 'accept' : 'decline'}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: Number(UID), name: UNAME, request_id: id })
+    });
+    if (r.ok) { showToast(accept ? 'Принято!' : 'Отклонено'); loadFamily(); }
+    else { const e = await r.json().catch(() => ({})); showToast('⚠ ' + (e.error || 'Ошибка')); }
+  } catch { showToast('⚠ Сервер недоступен'); }
+}
+
+// ── AI-помощник ──────────────────────────────────────────────────────
+// Чат с моделью через сервер (ключ хранится на сервере, не в приложении).
+function aiPush(role, text) {
+  const log = $('aiLog');
+  const m = document.createElement('div');
+  m.className = 'ai-msg ' + role;
+  m.textContent = text;
+  log.appendChild(m);
+  log.scrollTop = log.scrollHeight;
+  return m;
+}
+
+$('aiBtn').onclick = () => {
+  haptic();
+  $('aiOv').classList.add('open');
+  if (!$('aiLog').children.length) {
+    aiPush('bot', 'Привет! Я помощник Pillio. Могу ответить на вопросы о ваших лекарствах: как принимать, с чем сочетать, что делать при пропуске дозы.');
+  }
+  $('aiInput').focus();
+};
+$('aiOv').onclick = e => { if (e.target === $('aiOv')) $('aiOv').classList.remove('open'); };
+
+let aiBusy = false;
+$('aiSend').onclick = async () => {
+  const q = $('aiInput').value.trim();
+  if (!q || aiBusy) return;
+  aiBusy = true;
+  $('aiInput').value = '';
+  aiPush('user', q);
+  const wait = aiPush('bot', '…');
+  try {
+    const db = dbLoad();
+    const context = db.pills
+      .map(p => `${p.name} ${p.dosage} ${p.unit}, каждые ${p.interval_hours} ч, ${MEAL_FULL[p.meal_relation] || 'без привязки к еде'}`)
+      .join('; ');
+    const r = await rfetch('/api/ai/ask', { method: 'POST', body: JSON.stringify({ question: q, context }) });
+    const d = await r.json().catch(() => ({}));
+    wait.textContent = d.answer || ('⚠ ' + (d.error || 'AI недоступен'));
+  } catch { wait.textContent = '⚠ Нет соединения с сервером'; }
+  aiBusy = false;
+};
+$('aiInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('aiSend').onclick(); });
+
+// ── Settings ─────────────────────────────────────────────────────────
+$('setExport').onclick = async () => {
+  haptic();
+  try {
+    const pills  = await (await apiFetch(`${API}/api/pills`)).json();
+    const scheds = await (await apiFetch(`${API}/api/schedule?date=${todayISO()}`)).json();
+    const blob   = new Blob([JSON.stringify({ pills, schedule: scheds }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'pillio_export.json'; a.click();
+    showToast('Данные экспортированы');
+  } catch { showToast('⚠ Ошибка экспорта'); }
+};
+
+$('setReset').onclick = async () => {
+  haptic(); if (!confirm('Удалить ВСЕ данные? Это действие необратимо.')) return;
+  try {
+    const pills = await (await apiFetch(`${API}/api/pills`)).json();
+    for (const p of pills) await apiFetch(`${API}/api/pills/${p.id}`, { method: 'DELETE' });
+    showToast('Все данные удалены'); loadSchedule();
+  } catch { showToast('⚠ Ошибка'); }
+};
+
+// ── Toast ────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────
+function initApp() { initHeader(); loadSchedule(); rescheduleNotifications(); }
+if (obDone) initApp();
+</script>
+</body>
+</html>
